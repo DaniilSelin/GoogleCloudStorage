@@ -1,0 +1,30 @@
+{
+    "LoadCloud": {
+        "path_parts": "LoadCloud",
+        "id": "14upko_djrwN2CJY2Vgxvn8okp4GYenvi",
+        "subfolders": {
+            "folber1": {
+                "path_parts": "LoadCloud/folber1",
+                "id": "1negk2y64d41sH5Sva2oP1_eOdAOromIS",
+                "subfolders": {
+                    "folber": {
+                        "path_parts": "LoadCloud/folber1/folber",
+                        "id": "1quQW_pSXzaAmUg6XGO4MJkW6UhCDsgUl",
+                        "subfolders": {}
+                    }
+                }
+            },
+            "folber2": {
+                "path_parts": "LoadCloud/folber2",
+                "id": "1jVTILrkQZ5Gylke-JcPQHNHfxqFENHz7",
+                "subfolders": {
+                    "folber": {
+                        "path_parts": "LoadCloud/folber2/folber",
+                        "id": "1aIEijd0pefG3H4GT0RVrXWLj_FQ0ypcU",
+                        "subfolders": {}
+                    }
+                }
+            }
+        }
+    }
+}
