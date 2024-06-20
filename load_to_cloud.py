@@ -69,7 +69,18 @@ class GoogleCloudTerminal:
                 with open(self.token_path, 'w') as token:
                     token.write(GoogleCloudTerminal.creds.to_json())
 
-    def change_directory(self, path_new):
+    def execute_command(self, input_string: str):
+        command, args = CommandParser.parser_command(input_string)
+
+        if command == 'cd':
+            print("GVT ", command, args)
+            self.change_directory(args)
+        elif command == 'ls':
+            self.list_files(args)
+        else:
+            print(f"Unknown command: {command}")
+
+    def change_directory(self, args):
         """
         Изменяет текущий рабочий каталог на указанный путь, если он существует.
 
@@ -77,13 +88,19 @@ class GoogleCloudTerminal:
             path_new (str): Новый путь для перехода.
         """
         try:
-            new_path = PathNavigator.validate_path(path=path_new, current_path=GoogleCloudTerminal.current_path)
+            new_path = PathNavigator.validate_path(path=args.path, current_path=GoogleCloudTerminal.current_path)
 
             if new_path:
                 GoogleCloudTerminal.current_path = new_path
         except Exception:
             print("Error: New path is incorrect")
 
+    def list_files(self, args):
+        try:
+            FileManager.ls(path=args.path, show_long=args.long)
+
+        except Exception:
+            print("Error: ls called except")
 
 class FileManager:
 
@@ -278,30 +295,16 @@ class FileManager:
         else:
             path_parts_id = GoogleCloudTerminal.current_path
 
+        if not path_parts_id:
+            print("Path is incorrect. ")
+            return
 
         for file in files:
-            if 'parents' in file and file['parents'] == path_parts_id:
+            if 'parents' in file.keys() and file['parents'][0] == path_parts_id:
                 if show_long:
                     print(file['name'], " ", file['id'], " ", file['mimeType'])
                 else:
                     print(file['name'])
-
-    @staticmethod
-    def parse_args_ls(args):
-        parser = argparse.ArgumentParser(description="List files in the specified directory. ")
-        parser.add_argument('path', nargs="?", default=None, help='Path to list')
-        parser.add_argument('-l', '--long', action='store_true', help="Use a long listing format")
-        options = parser.parse_args(args)
-
-        # Проверка на наличие --help или -h
-        if '--help' in args or '-h' in args:
-            try:
-                parser.print_help()
-            # не дать боярину стопнуть программу
-            except SystemExit:
-                pass
-
-        return options
 
     @staticmethod
     def mkdir(creds, root=False):
@@ -496,6 +499,9 @@ class PathNavigator:
 
         list_id = FileManager.look_for_file(name=path_parts[0], mime_type="application/vnd.google-apps.folder")
 
+        if not list_id:
+            return None
+
         # проверяем все папки с именем куда мы должны переместиться
         for parent_id in list_id:
             if check_parents(parent_id, 1):
@@ -559,6 +565,74 @@ class PathNavigator:
         # Метод для поиска файла по указанному пути
         pass
 
+class CommandParser:
+    @staticmethod
+    def parser_command(input_string):
+        commands = {
+            'ls': CommandParser.parse_args_ls,
+            'cd': CommandParser.parse_args_ls
+        }
+
+        parts = input_string.strip().split()
+
+        if not parts:
+            return None, None
+
+        command = parts[0]
+        args = parts[1:]
+
+        if command in command:
+            return command, commands[command](args)
+        else:
+            print(f"Unknown command: {command}")
+            return None, None
+
+    @staticmethod
+    def parse_args_ls(args):
+        parser = argparse.ArgumentParser(description="List files in the specified directory. ")
+        parser.add_argument('path', nargs="?", default=None, help='Path to list')
+        parser.add_argument('-l', '--long', action='store_true', help="Use a long listing format")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            print(e)
+            return None
+
+    @staticmethod
+    def parse_args_cd(args):
+        parser = argparse.ArgumentParser(description="Change directory.")
+        parser.add_argument('path', help="Path to change to")
+        print(args)
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            print(e)
+            return None
+
 class UserInterface:
     def __init__(self):
         pass
@@ -578,18 +652,11 @@ class UserInterface:
 if __name__ == '__main__':
     terminal = GoogleCloudTerminal()
 
-
-    terminal.change_directory("./LoadCloud")
-    terminal.change_directory('./folber2')
     print("ur part path is ", PathNavigator.pwd(terminal.current_path))
     while True:
 
-        ls = sys.stdin.readline().split()
+        input_string = sys.stdin.readline()
 
-        args = ls
-
-        parsed_args = FileManager.parse_args_ls(args)
-        print(parsed_args.path, parsed_args.long)
-        FileManager.ls(parsed_args.path, parsed_args.long)
+        terminal.execute_command(input_string)
 
         sys.stdout.write(f'{PathNavigator.pwd(terminal.current_path)} $ ')
