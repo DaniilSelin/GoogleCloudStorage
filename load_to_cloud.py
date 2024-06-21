@@ -2,6 +2,7 @@ import os
 import sys
 from typing import Any
 import argparse
+import re
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -70,15 +71,31 @@ class GoogleCloudTerminal:
                     token.write(GoogleCloudTerminal.creds.to_json())
 
     def execute_command(self, input_string: str):
-        command, args = CommandParser.parser_command(input_string)
+        """
+        Выполняет команду, введенную пользователем.
 
-        if command == 'cd':
-            print("GVT ", command, args)
-            self.change_directory(args)
-        elif command == 'ls':
-            self.list_files(args)
-        else:
-            print(f"Unknown command: {command}")
+        Эта функция принимает строку команды, разбирает её на команду и аргументы,
+        а затем вызывает соответствующий метод для выполнения этой команды.
+
+        Args:
+            input_string (str): Строка команды, введенная пользователем.
+        """
+        try:
+            command, args = CommandParser.parser_command(input_string)
+
+            if command == 'cd':
+                self.change_directory(args)
+            elif command == 'ls':
+                self.list_files(args)
+            elif command == 'mkdir':
+                self.make_directory(args)
+            elif command == 'cp':
+                self.copy(args)
+            else:
+                print(f"Unknown command: {command}")
+
+        except Exception:
+            print(f"Unknown command")
 
     def change_directory(self, args):
         """
@@ -96,9 +113,36 @@ class GoogleCloudTerminal:
             print("Error: New path is incorrect")
 
     def list_files(self, args):
+        """
+        Метод для вывода списка файлов в текущем каталоге.
+        Args:
+            args: Аргументы для команды 'ls'.
+        """
         try:
             FileManager.ls(path=args.path, show_long=args.long)
 
+        except Exception:
+            print("Error: ls called except")
+
+    def make_directory(self, args):
+        """
+        Метод для создания директории
+        Args:
+            args: Аргументы для команды 'mkdir'.
+        """
+        try:
+            FileManager.mkdir(path=args.path, create_parents=args.parents)
+        except Exception:
+            print("Error: ls called except")
+
+    def copy(self, args):
+        """
+        Метод для копирования файлов/директорий
+        Args:
+            args: Аргументы для команды 'cp'.
+        """
+        try:
+            FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
         except Exception:
             print("Error: ls called except")
 
@@ -106,6 +150,14 @@ class FileManager:
 
     @staticmethod
     def get_user_drive_id():
+        """
+        Не предпологает использованием польователем напрямую.
+        Функция для получения идентификатора драйвера пользователя.
+        Этот идентификатор используется почти во всез функциях!
+
+        Returns:
+            str: Идентификатор MyDrive.
+        """
         headers = {
             'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
             'Content-Type': 'application/json'
@@ -130,6 +182,7 @@ class FileManager:
     @staticmethod
     def get_list_of_files(called_directly=True):
         """
+        Не предпологает использованием польователем напрямую.
         Функция для получения списка файлов Google Drive API v3.
 
         Args:
@@ -179,14 +232,13 @@ class FileManager:
     @staticmethod
     def get_file_metadata(file_id):
         """
-        Получение метаданных файла по его идентификатору. Работет лучше чем мой поиск по идентификатору
+        Получение метаданных файла по его идентификатору.
 
         Args:
-            creds: Учетные данные для авторизации.
             file_id: Идентификатор файла.
 
         Returns:
-            dict: Метаданные файла (включая идентификаторы родительских папок).
+            dict: Метаданные файла.
         """
         headers = {
             'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
@@ -287,6 +339,13 @@ class FileManager:
 
     @staticmethod
     def ls(path, show_long=False):
+        """
+        Отображает список файлов в указанной директории.
+
+        Args:
+            path (str): Путь к директории для отображения. Если None, используется текущая директория.
+            show_long (bool): Если True, используется длинный формат отображения (выводит имя файла, его идентификатор и тип).
+        """
 
         files = FileManager.get_list_of_files(called_directly=False)
 
@@ -307,40 +366,67 @@ class FileManager:
                     print(file['name'])
 
     @staticmethod
-    def mkdir(creds, root=False):
+    def mkdir(path, create_parents=False, start_path=None):
         """
-        Функция для осздания папки в Google Drive.
+        Создает новую директорию по указанному пути.
 
         Args:
-            creds (Credentials): Учетные данные для аутентификации в Google API.
-            root (bool, optional): Флаг, указывающий, что функция вызвана для создания корневой папки.
-                                            По умолчанию False.
-
-        Returns:
-            function: Вызываем функцию описка корневой еще раз.
-                    Возвращает None в случае ошибки.
+            path (str): Путь к новой директории.
+            create_parents (bool): Если True, создаются все необходимые родительские директории.
         """
+
+        if create_parents:
+            gather_needed = PathNavigator.gather_needed_paths(path)
+            start_path, paths_to_create = gather_needed.values()
+            new_paths_id =[]
+
+            while paths_to_create:
+                start_path = FileManager.mkdir(paths_to_create[0], start_path=start_path)
+
+                new_paths_id.append(start_path)
+                paths_to_create.pop(0)
+
+            return new_paths_id
+
+        path_parts = re.sub('\n', "", path)
+
+        path_parts = path_parts.strip("/").split("/")
+        name_path = path_parts[-1]
+
+        if start_path:
+            parents_id = start_path
+        else:
+            path_parts = "/".join(path_parts[:-1])
+
+            parents_id = PathNavigator.validate_path(path_parts, GoogleCloudTerminal.current_path)
+
+            if not parents_id:
+                print("Path is incorrect")
+                return None
+
+
+        print("Create path: ", path, name_path, parents_id)
+
         # Создаем заголовок с авторизационным токеном
         headers = {
-            'Authorization': f'Bearer {creds.token}'
+            'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
+            'Content-Type': 'application/json',
         }
 
         # URL запроса для получения списка файлов Google Drive API v3
         url = 'https://www.googleapis.com/drive/v3/files'
 
         body = {
-            "name": "LoadCloud",
+            "name": name_path,
             "mimeType": "application/vnd.google-apps.folder",
+            'parents': [parents_id]
         }
 
         response = requests.post(url, headers=headers, json=body)
 
         if response.status_code == 200:
-            if root:
-                print("root folber not found, i will try create root folber")
-                print('Create folber compleate')
-                return FileManager.look_for_file("LoadCloud")
             print('Create folber compleate')
+            return response.json()['id']
         else:
             print(f'error when creating folber: {response.status_code} - {response.text}')
             return None
@@ -351,7 +437,7 @@ class FileManager:
         pass
 
     @staticmethod
-    def copy(file_id: str, path: str):
+    def cp(source: str, destination: str, recursive=False):
         """
         Функция для создания копии файла в Google Drive.
         Args:
@@ -364,7 +450,6 @@ class FileManager:
             Указание пути необходимо, так как в разным папках может находится майлы/папки
             с одинаковыми именами!!!
         Returns: Информация о созданной копии файла.
-        """
 
         if path == "/":
             body = {
@@ -407,7 +492,7 @@ class FileManager:
                 error_message = response.text
             print('Failed to copy file. Status code:', response.status_code)
             print('Error message:', error_message)
-            return None
+            return None"""
 
     @staticmethod
     def remove(creds, file_id):
@@ -429,6 +514,8 @@ class FileManager:
 class PathNavigator:
     @staticmethod
     def validate_path(path, current_path=GoogleCloudTerminal.current_path):
+        # ОПАСНО не указывать current_path напрямую, так как питон заполняет это поле,
+        # базовым значением, которе мы указали в GCT.current_path = root
         """
         Проверяет и возвращает идентификатор каталога по указанному пути.
 
@@ -439,7 +526,6 @@ class PathNavigator:
         Returns:
             str or None: Идентификатор папки, если путь существует, иначе None.
         """
-
         import re
 
         path = re.sub('\n',"", path)
@@ -463,7 +549,7 @@ class PathNavigator:
             # запрашиваем ид родителя
             post_path_id = post_path["parents"][0]
 
-            if post_path_id == should_parents:
+            if post_path_id == should_parents and len(path_parts) == path_index:
                 return True
 
             name_post_path = FileManager.look_for_file(file_id=post_path_id)
@@ -551,26 +637,69 @@ class PathNavigator:
             return "MyDrive/"
 
     @staticmethod
-    def parse_path(path):
-        # Метод для разбора пути и получения идентификаторов папок и файлов
-        pass
+    def gather_needed_paths(path: str):
+        """
+        Собирает пути, которые нужно создать.
 
-    @staticmethod
-    def navigate_to_directory(self, path):
-        # Метод для навигации по структуре папок
-        pass
+        Args:
+            path (str): Путь, который нужно проверить.
+            current_path (str): Текущий путь.
 
-    @staticmethod
-    def find_file_by_path(self,path):
-        # Метод для поиска файла по указанному пути
-        pass
+        Returns:
+            dict: Словарь с ключами 'start_path' и 'paths_to_create'.
+        """
+        start_path = None
+        path_to_create = []
+
+        def check_path_parts(path_parts):
+            nonlocal start_path, path_to_create
+            start_path = PathNavigator.validate_path(path_parts, GoogleCloudTerminal.current_path)
+
+            if start_path:
+                return True
+
+            path_to_create.append(path_parts)
+
+            path_parts = re.sub('\n', "", path_parts)
+
+            path_parts = path_parts.strip("/").split("/")
+
+            path_parts = "/".join(path_parts[:-1])
+
+            check_path_parts(path_parts)
+
+        check_path_parts(path)
+
+        if not start_path:
+            return None
+
+        return {"start_path": start_path, "path_to_create": path_to_create[::-1]}
 
 class CommandParser:
+    """
+    Класс для разбора и обработки команд, введенных пользователем.
+
+    Этот класс содержит методы для аргументов команд,
+    а также для обработки ошибок, связанных с неправильными аргументами.
+    """
     @staticmethod
     def parser_command(input_string):
+        """
+        Разбирает строку команды и возвращает соответствующую команду и её аргументы.
+
+        Args:
+            input_string (str): Строка команды, введенная пользователем.
+
+        Returns:
+            tuple: Кортеж, содержащий команду (str) и разобранные аргументы (Namespace) или (None, None), если команда не распознана.
+
+        """
+        # словарь с командами и их парсерами
         commands = {
             'ls': CommandParser.parse_args_ls,
-            'cd': CommandParser.parse_args_ls
+            'cd': CommandParser.parse_args_cd,
+            'mkdir': CommandParser.parse_args_mkdir,
+            'cp': CommandParser.parse_args_cp,
         }
 
         parts = input_string.strip().split()
@@ -589,9 +718,52 @@ class CommandParser:
 
     @staticmethod
     def parse_args_ls(args):
+        """
+        Парсер команды 'ls'.
+
+        Args:
+            args (list): Список аргументов для команды 'ls'.
+
+        Returns:
+            Namespace: Разобранные аргументы или None,
+                                если произошла ошибка или был запрошен help.
+        """
         parser = argparse.ArgumentParser(description="List files in the specified directory. ")
         parser.add_argument('path', nargs="?", default=None, help='Path to list')
         parser.add_argument('-l', '--long', action='store_true', help="Use a long listing format")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            print(e)
+            return None
+
+    @staticmethod
+    def parse_args_cd(args):
+        """
+        Парсер команды 'cd'.
+
+        Args:
+            args (list): Список аргументов для команды 'cd'.
+
+        Returns:
+            Namespace: Разобранные аргументы или None,
+                                если произошла ошибка или был запрошен help.
+
+        """
+        parser = argparse.ArgumentParser(description="Change directory.")
+        parser.add_argument('path', help="Path to change to")
 
         try:
             # Проверка на наличие --help или -h
@@ -611,10 +783,10 @@ class CommandParser:
             return None
 
     @staticmethod
-    def parse_args_cd(args):
-        parser = argparse.ArgumentParser(description="Change directory.")
-        parser.add_argument('path', help="Path to change to")
-        print(args)
+    def parse_args_mkdir(args):
+        parser = argparse.ArgumentParser(description="Create a new directory. ")
+        parser.add_argument('path', nargs="+", default=None, help='Path to the new directory. ')
+        parser.add_argument('-p', '--parents', action='store_true', help="Make parents directories as needed. ")
 
         try:
             # Проверка на наличие --help или -h
@@ -623,9 +795,33 @@ class CommandParser:
                 return None
 
             return parser.parse_args(args)
-
         except SystemExit:
             # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            print(e)
+            return None
+
+    @staticmethod
+    def parse_args_cp(args):
+        parser = argparse.ArgumentParser(description="Copy file from source to destination. ")
+        parser.add_argument('source', nargs="?", required=True, default=None, help='Path file that needs copy. ')
+        parser.add_argument('destination', nargs="?", required=True, default=None, help='Where to copy file. ')
+        parser.add_argument('-r', '--recursive', action='store_true', help="The need to recursively copy the contents of the directory. ")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
             pass
 
         except argparse.ArgumentError as e:
@@ -650,11 +846,11 @@ class UserInterface:
         return sys.stdin.readlines(prompt)
 
 if __name__ == '__main__':
+
     terminal = GoogleCloudTerminal()
 
-    print("ur part path is ", PathNavigator.pwd(terminal.current_path))
+    sys.stdout.write(f'{PathNavigator.pwd(terminal.current_path)} $ ')
     while True:
-
         input_string = sys.stdin.readline()
 
         terminal.execute_command(input_string)
