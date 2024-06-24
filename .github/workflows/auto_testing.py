@@ -19,8 +19,8 @@ class Testing(unittest.TestCase):
 
         #создаем терминал для наших тестов
         self.terminal = load_to_cloud.GoogleCloudTerminal(
-            token_path=os.path.join(os.path.dirname(__file__), "../token.json"),
-            credentials_path=os.path.join(os.path.dirname(__file__), "../credentials.json")
+            token_path=os.path.join(os.path.dirname(__file__), "../../token.json"),
+            credentials_path=os.path.join(os.path.dirname(__file__), "../../credentials.json")
         )
 
     def setUp(self):
