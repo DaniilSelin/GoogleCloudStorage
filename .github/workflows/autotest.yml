@@ -27,7 +27,7 @@ jobs:
       run: touch ./test-reports/results.log
 
     - name: Run auto_testing.py
-      run: ./python auto_testing.py > ./test-reports/results.log
+      run: python ./auto_testing.py > ./test-reports/results.log
 
     - name: Upload test results
       uses: actions/upload-artifact@v2
