@@ -5,9 +5,15 @@ import os
 
 import os
 
-# Ensure test-reports directory exists
+# ест ли у нас директория для логов?
 if not os.path.exists('test-reports'):
     os.makedirs('test-reports')
+
+# есть ли там файл?
+results_file = 'test-reports/results.log'
+if not os.path.exists(results_file):
+    with open(results_file, 'w'):
+        pass  # Создание пустого файла
 
 # получаем тест кейсы
 with open("test_struct.json", "r") as test_struct:
