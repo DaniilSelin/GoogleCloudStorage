@@ -30,10 +30,10 @@ jobs:
       run: ls -l
       
     - name: List files in current directory
-      run: ls ./test-reports/
+      run: ls .github/workflows/
       
     - name: Run auto_testing.py
-      run: python auto_testing.py > ./test-reports/results.log
+      run: python .github/workflows/auto_testing.py > .github/workflows/test-reports/results.log
 
     - name: Upload test results
       uses: actions/upload-artifact@v2
