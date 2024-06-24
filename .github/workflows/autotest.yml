@@ -25,4 +25,4 @@ jobs:
           PYTHONPATH: /home/runner/work/GoogleCloudStorage/GoogleCloudStorage
         run: |
           mkdir -p test-reports
-          python .github/workflows/auto_testing.py > test-reports/results.log
+          python .github/workflows/auto_testing.py > .github/workflows/test-reports/results.log
