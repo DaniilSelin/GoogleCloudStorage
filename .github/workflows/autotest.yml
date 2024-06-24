@@ -25,7 +25,13 @@ jobs:
 
     - name: Create results.log
       run: touch ./test-reports/results.log
-
+      
+    - name: List files in current directory
+      run: ls -l
+      
+    - name: List files in current directory
+      run: ls ./test-reports/
+      
     - name: Run auto_testing.py
       run: python auto_testing.py > ./test-reports/results.log
 
