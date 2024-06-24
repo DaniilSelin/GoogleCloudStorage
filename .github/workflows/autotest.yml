@@ -23,6 +23,9 @@ jobs:
     - name: Create test-reports directory
       run: mkdir -p test-reports
 
+    - name: Create results.log
+      run: touch ./test-reports/results.log
+
     - name: Run auto_testing.py
       run: python auto_testing.py > test-reports/results.log
 
