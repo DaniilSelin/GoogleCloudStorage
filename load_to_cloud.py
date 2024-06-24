@@ -30,8 +30,9 @@ class GoogleCloudTerminal:
             token_path (str): Путь к файлу токена.
             credentials_path (str): Путь к файлу учетных данных.
         """
-        self.token_path = token_path
-        self.credentials_path = credentials_path
+        # Чтобы это работало и на винде, подходи м к файлам по абсолютному пути
+        self.token_path = os.path.join(os.path.dirname(__file__), "./token.json")
+        self.credentials_path = os.path.join(os.path.dirname(__file__), "./credentials.json")
 
         #авто запуск авторизации
         self._autorization()
