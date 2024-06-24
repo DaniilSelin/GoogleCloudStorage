@@ -1,26 +1,27 @@
 {
-    "file_test_id": {
-        "name": "vu-acm-icpc-trd",
-        "id": "1jxgUUdzzB9UHdEJnt5u0cOe4mF1oOw6Ksw1uDmgtDp4"
-    },
-    "LoadCloud": {
-        "path_parts": "LoadCloud",
-        "id": "14upko_djrwN2CJY2Vgxvn8okp4GYenvi"
-    },
-    "LoadCloud/folber1": {
-        "path_parts": "LoadCloud/folber1",
-        "id": "1negk2y64d41sH5Sva2oP1_eOdAOromIS"
-    },
-    "LoadCloud/folber1/folber": {
-        "path_parts": "LoadCloud/folber1/folber",
-        "id": "1quQW_pSXzaAmUg6XGO4MJkW6UhCDsgUl"
-    },
-    "LoadCloud/folber2": {
-        "path_parts": "LoadCloud/folber2",
-        "id": "1jVTILrkQZ5Gylke-JcPQHNHfxqFENHz7"
-    },
-    "LoadCloud/folber2/folber": {
-        "path_parts": "LoadCloud/folber2/folber",
-        "id": "1aIEijd0pefG3H4GT0RVrXWLj_FQ0ypcU"
-    }
+    "cd": [
+        "cd ./LoadCloud/folder2/folder",
+        "cd ../../folder1/folder",
+        "cd ~/LoadCloud",
+        "cd ~/"
+    ],
+    "ls": [
+        "ls ~/",
+        "ls ~/LoadCloud",
+        "ls ~/LoadCloud/folder1/",
+        "ls ~/LoadCloud/folder2",
+        "ls ~/LoadCloud/folder1/folder",
+        "ls ~/LoadCloud/folder2/folder"
+    ],
+    "mkdir":[
+        "mkdir ./LoadCloud/folder2/folder -p",
+        "mkdir ./LoadCloud/folder1/folder -p"
+    ],
+    "rm": [
+        "rm ./LoadCloud/folder2/folder",
+        "rm ./LoadCloud/folder1/folder",
+        "rm ./LoadCloud/folder2",
+        "rm ./LoadCloud/folder1",
+        "rm ./LoadCloud"
+    ]
 }

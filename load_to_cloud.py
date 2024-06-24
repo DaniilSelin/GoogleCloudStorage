@@ -80,6 +80,21 @@ class GoogleCloudTerminal:
         Args:
             input_string (str): Строка команды, введенная пользователем.
         """
+        command, args = CommandParser.parser_command(input_string)
+
+        if command == 'cd':
+            return self.change_directory(args)
+        elif command == 'ls':
+            return self.list_files(args)
+        elif command == 'mkdir':
+            return self.make_directory(args)
+        elif command == 'cp':
+            return self.copy(args)
+        elif command == 'rm':
+            return self.remove(args)
+        else:
+            print(f"Unknown command: {command}")
+        """
         try:
             command, args = CommandParser.parser_command(input_string)
 
@@ -95,7 +110,7 @@ class GoogleCloudTerminal:
                 print(f"Unknown command: {command}")
 
         except Exception:
-            print(f"Unknown command")
+            print(f"Unknown command")"""
 
     def change_directory(self, args):
         """
@@ -109,6 +124,7 @@ class GoogleCloudTerminal:
 
             if new_path:
                 GoogleCloudTerminal.current_path = new_path
+                return new_path
         except Exception:
             print("Error: New path is incorrect")
 
@@ -119,7 +135,7 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'ls'.
         """
         try:
-            FileManager.ls(path=args.path, show_long=args.long)
+            return FileManager.ls(path=args.path, show_long=args.long)
 
         except Exception:
             print("Error: ls called except")
@@ -131,7 +147,7 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'mkdir'.
         """
         try:
-            FileManager.mkdir(path=args.path, create_parents=args.parents)
+            return FileManager.mkdir(path=args.path[0], create_parents=args.parents)
         except Exception:
             print("Error: ls called except")
 
@@ -141,10 +157,21 @@ class GoogleCloudTerminal:
         Args:
             args: Аргументы для команды 'cp'.
         """
+        FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
+        """
         try:
             FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
         except Exception:
-            print("Error: ls called except")
+            print("Error: ls called except")"""
+
+    def remove(self, args):
+        """
+        Метод для удаления файлов/директорий
+        Args:
+            args: Аргументы для команды 'rm'.
+        """
+        FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose)
+
 
 class FileManager:
 
@@ -247,7 +274,7 @@ class FileManager:
 
         url = f'https://www.googleapis.com/drive/v3/files/{file_id}'
         params = {
-            'fields': 'name, id, parents'
+            'fields': 'name, id, parents, mimeType'
         }
 
         response = requests.get(url, headers=headers, params=params)
@@ -378,7 +405,7 @@ class FileManager:
         if create_parents:
             gather_needed = PathNavigator.gather_needed_paths(path)
             start_path, paths_to_create = gather_needed.values()
-            new_paths_id =[]
+            new_paths_id = []
 
             while paths_to_create:
                 start_path = FileManager.mkdir(paths_to_create[0], start_path=start_path)
@@ -438,70 +465,79 @@ class FileManager:
 
     @staticmethod
     def cp(source: str, destination: str, recursive=False):
-        """
-        Функция для создания копии файла в Google Drive.
-        Args:
-        creds: Учетные данные для авторизации.
-        file_id: Идентификатор файла, который нужно скопировать.
-        path: место куда копировать наш файл, вот шаблон
-            "./path" - начиная с нынешней директории
-            "../" - начная с родительско директории
-            "/"- путь начиная с корня
-            Указание пути необходимо, так как в разным папках может находится майлы/папки
-            с одинаковыми именами!!!
-        Returns: Информация о созданной копии файла.
+        source_id = PathNavigator.validate_path(source, GoogleCloudTerminal.current_path)
+        destination_id = PathNavigator.validate_path(destination, GoogleCloudTerminal.current_path)
+        # проверяем корректность обоих путей
+        if not source_id:
+            print("Source is incorrect")
+            return None
+        if not destination_id:
+            print("Destination is incorrect")
+            return None
 
-        if path == "/":
-            body = {
-                "parents": ['root'],
-            }
+        # сначала проверим тип файла, и если он не папка, то независимо от recursive
+        # копируем только этот файл
+        file_source = FileManager.get_file_metadata(source_id)
+
+        if file_source['mimeType'] != 'application/vnd.google-apps.folder' or not recursive:
+            # это условие стоит перым, так как у не папки детей быть не может
+            if FileManager._copy_file(source_id, destination_id):
+                print(f'File copied successfully to {destination}')
         else:
-            parents = PathNavigator.validate_path(path, file_id)
+            if FileManager._copy_directory(source_id, destination_id):
+                print(f'Recursive files copied successfully to {destination}')
 
-            if not parents:
-                print("Enter path is incorrect, try again")
-                return False
-
-            body = {
-                "parents": [f'{parents}'],
-            }
-
-        # Создаем заголовок с авторизационным токеном
+    @staticmethod
+    def _copy_file(source_id, destination_id):
+        # Реализация копирования одного файла
         headers = {
             'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
             'Content-Type': 'application/json',
         }
-
-        # URL запроса для копирования файла Google Drive API v3
-        url = f'https://www.googleapis.com/drive/v3/files/{file_id}/copy'
-
+        url = f'https://www.googleapis.com/drive/v3/files/{source_id}/copy'
+        body = {
+            'parents': [destination_id]
+        }
         response = requests.post(url, headers=headers, json=body)
-
         if response.status_code == 200:
-            # Обработка успешного ответа
-            file_info = response.json()
-            print('File copied successfully.')
-            print('File ID:', file_info['id'])
-            print('File Name:', file_info['name'])
-            return file_info
+            return response.json()
         else:
-            # Обработка ошибки
-            try:
-                error_message = response.json()
-            except ValueError:
-                error_message = response.text
-            print('Failed to copy file. Status code:', response.status_code)
-            print('Error message:', error_message)
-            return None"""
+            print(f"Error copying file: {response.status_code} - {response.text}")
+            return None
 
     @staticmethod
-    def remove(creds, file_id):
+    def _copy_directory(source_id, destination_id):
+        needed_copy = PathNavigator.gather_structure_copy(source_id)
+
+        iterator = iter(needed_copy)
+
+        # использую стандартный итератор для фикса проблемы с извлечением следующего элемента при "?"
+        for file in iterator:
+
+            if file == "!":
+                next_file = next(iterator, None)
+                next_file = FileManager._copy_file(next_file, destination_id)
+                destination_id = next_file['id']
+
+            if file == "?":
+                previous_file = FileManager.get_file_metadata(destination_id)
+                destination_id = previous_file['parents'][0]
+
+            FileManager._copy_file(file, destination_id)
+
+        return True
+
+    @staticmethod
+    def rm(path, recursive, verbose):
+
+        needed_remove = PathNavigator.validate_path(path, GoogleCloudTerminal.current_path, check_file=True)
+
         headers = {
-            'Authorization': f'Bearer {creds.token}'
+            'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}'
         }
 
         # URL запроса для удаления файла Google Drive API v3
-        url = f'https://www.googleapis.com/drive/v3/files/{file_id}'
+        url = f'https://www.googleapis.com/drive/v3/files/{needed_remove}'
 
         response = requests.delete(url, headers=headers)
 
@@ -511,9 +547,10 @@ class FileManager:
             print(f'error when deleting file: {response.status_code} - {response.text}')
             return None
 
+
 class PathNavigator:
     @staticmethod
-    def validate_path(path, current_path=GoogleCloudTerminal.current_path):
+    def validate_path(path: str, current_path=GoogleCloudTerminal.current_path, check_file=False):
         # ОПАСНО не указывать current_path напрямую, так как питон заполняет это поле,
         # базовым значением, которе мы указали в GCT.current_path = root
         """
@@ -583,7 +620,10 @@ class PathNavigator:
 
         path_parts = path_parts[::-1]
 
-        list_id = FileManager.look_for_file(name=path_parts[0], mime_type="application/vnd.google-apps.folder")
+        if not check_file:
+            list_id = FileManager.look_for_file(name=path_parts[0], mime_type="application/vnd.google-apps.folder")
+        else:
+            list_id = FileManager.look_for_file(name=path_parts[0])
 
         if not list_id:
             return None
@@ -596,7 +636,7 @@ class PathNavigator:
         return None
 
     @staticmethod
-    def pwd(current_path_id):
+    def pwd(current_path_id: str):
         """
         Возвращает текущий путь от корня до текущей папки.
 
@@ -639,7 +679,7 @@ class PathNavigator:
     @staticmethod
     def gather_needed_paths(path: str):
         """
-        Собирает пути, которые нужно создать.
+        Выделяет все возможные пути, которые не существуют.
 
         Args:
             path (str): Путь, который нужно проверить.
@@ -675,6 +715,38 @@ class PathNavigator:
 
         return {"start_path": start_path, "path_to_create": path_to_create[::-1]}
 
+    @staticmethod
+    def gather_structure_copy(source_id: str):
+        """
+        Выделяет всю ветку начная с файла source и заканчивая всеми путями исходящими из него.
+
+        Args:
+            source_id (str): Файл, с которого начнается выделяемая ветка.
+
+        Returns:
+            lisе: список файлов в СТРОГОЙ послдеовательности для копирования.
+                    "?" - сигнал о заврешении ветки в пути. Надо сделать шаг назад:
+                            присваиваем destination_id ид папки, сразу после "?"
+                    "!" - сигнал о начале ветки в пути. Надо сделать шаг вперед:
+                            присваиваем destination_id ид родительской папки текщуей папки.
+        """
+
+        all_files = FileManager.get_list_of_files(called_directly=False)
+
+        subfiles = []
+
+        for file in all_files:
+            if file['parents'][0] == source_id:
+                if file['mimeType'] == 'application/vnd.google-apps.folder':
+                    # ОЧень похоже на поиск в глубину (алгоритм DFS)
+                    subfiles = (subfiles + ["!"] + [file] +
+                                PathNavigator.gather_structure_copy(file['id']) + ["?"])
+                else:
+                    subfiles.append(file)
+
+        return subfiles
+
+
 class CommandParser:
     """
     Класс для разбора и обработки команд, введенных пользователем.
@@ -694,15 +766,18 @@ class CommandParser:
             tuple: Кортеж, содержащий команду (str) и разобранные аргументы (Namespace) или (None, None), если команда не распознана.
 
         """
+        import shlex
+
         # словарь с командами и их парсерами
         commands = {
             'ls': CommandParser.parse_args_ls,
             'cd': CommandParser.parse_args_cd,
             'mkdir': CommandParser.parse_args_mkdir,
             'cp': CommandParser.parse_args_cp,
+            'rm': CommandParser.parse_args_rm,
         }
 
-        parts = input_string.strip().split()
+        parts = shlex.split(input_string)  # Используем shlex для разбора строки
 
         if not parts:
             return None, None
@@ -719,7 +794,8 @@ class CommandParser:
     @staticmethod
     def parse_args_ls(args):
         """
-        Парсер команды 'ls'.
+        Парсер команды 'ls'. В дальнейшем документироваться не будет,
+            так как структура для всез одна и та же
 
         Args:
             args (list): Список аргументов для команды 'ls'.
@@ -751,17 +827,6 @@ class CommandParser:
 
     @staticmethod
     def parse_args_cd(args):
-        """
-        Парсер команды 'cd'.
-
-        Args:
-            args (list): Список аргументов для команды 'cd'.
-
-        Returns:
-            Namespace: Разобранные аргументы или None,
-                                если произошла ошибка или был запрошен help.
-
-        """
         parser = argparse.ArgumentParser(description="Change directory.")
         parser.add_argument('path', help="Path to change to")
 
@@ -808,8 +873,8 @@ class CommandParser:
     @staticmethod
     def parse_args_cp(args):
         parser = argparse.ArgumentParser(description="Copy file from source to destination. ")
-        parser.add_argument('source', nargs="?", required=True, default=None, help='Path file that needs copy. ')
-        parser.add_argument('destination', nargs="?", required=True, default=None, help='Where to copy file. ')
+        parser.add_argument('source', nargs="?", default=None, help='Path file that needs copy. ')
+        parser.add_argument('destination', nargs="?", default=None, help='Where to copy file. ')
         parser.add_argument('-r', '--recursive', action='store_true', help="The need to recursively copy the contents of the directory. ")
 
         try:
@@ -829,6 +894,31 @@ class CommandParser:
             print(e)
             return None
 
+    @staticmethod
+    def parse_args_rm(args):
+        parser = argparse.ArgumentParser(description="Remove file from source to destination. ")
+        parser.add_argument('path', nargs="?", default=None, help='Path file that needs delete. ')
+        parser.add_argument('-r', '--recursive', action='store_true', help="The need to recursively delete the contents of the directory. ")
+        parser.add_argument('-v', '--verbose', action='store_true', help="Show information about remove files. ")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            print(f'Error when parse args command rm: {e}')
+            return None
+
+
 class UserInterface:
     def __init__(self):
         pass
@@ -845,14 +935,16 @@ class UserInterface:
     def request_input(self, prompt):
         return sys.stdin.readlines(prompt)
 
+
 if __name__ == '__main__':
 
     terminal = GoogleCloudTerminal()
 
     sys.stdout.write(f'{PathNavigator.pwd(terminal.current_path)} $ ')
+
     while True:
         input_string = sys.stdin.readline()
 
-        terminal.execute_command(input_string)
+        print(terminal.execute_command(input_string))
 
         sys.stdout.write(f'{PathNavigator.pwd(terminal.current_path)} $ ')

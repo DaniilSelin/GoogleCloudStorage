@@ -1,57 +1,74 @@
 import json
 import unittest
-#так как могут потребоваться фикстуры для регистрации в Gooogle API
-import pytest
+import sys
 import json
 import subprocess
 import load_to_cloud
 
-def input_recomande(input_set: list) -> str:
-    return input_set
 
 with open('test_struct.json', 'r') as file:
     test_cases = json.load(file)
 
-name_test_file = "../load_to_cloud.py"
 
-"""
 class Testing(unittest.TestCase):
+    terminal = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # контейнер для мусора
+        self.garbage = []
+        #создаем терминал для наших тестов
+        self.terminal = load_to_cloud.GoogleCloudTerminal(
+            token_path="../token.json",
+            credentials_path="../credentials.json"
+        )
+
     def setUp(self):
-        self.test_cases = test_cases
+        pass
 
-    def testing(self):
-        for input_set in self.test_cases:
-            input_value = input_recomande(input_set["input"])
-            expected_output = input_set["expected_output"]
+    @classmethod
+    def setUpClass(cls):
+        # Инициализируем экземпляр GoogleCloudTerminal, если он еще не был инициализирован
+        if cls.terminal is None:
+            cls.terminal = load_to_cloud.GoogleCloudTerminal(
+                token_path="../token.json",
+                credentials_path="../credentials.json"
+            )
 
-            with self.subTest(input_valuse=input_value):
-                result = subprocess.run(
-                    ['/usr/bin/python3', name_test_file],
-                    input=input_value,
-                    capture_output=True,
-                    text=True,
-                )
-                output = result.stdout.strip()
-                self.assertEqual(output, expected_output)"""
+        cls.test_cases = test_cases
+
+        # Здесь запускаем создание тестируемой структуры чере mkdir
+        test_cases_cd = test_cases['mkdir']
+
+        for tester in test_cases_cd:
+            sys.stdout.write(f'\n{load_to_cloud.PathNavigator.pwd(cls.terminal.current_path)} $ {tester}\n')
+            cls.terminal.execute_command(tester)
+
+    @classmethod
+    def tearDownClass(cls):
+        # чситим дериктории которые намутили
+        test_cases_cd = test_cases['rm']
+
+        for tester in test_cases_cd:
+            sys.stdout.write(f'\n{load_to_cloud.PathNavigator.pwd(cls.terminal.current_path)} $ {tester}\n')
+            cls.terminal.execute_command(tester)
+
+    def test_cd(self):
+        test_cases_cd = test_cases['cd']
+
+        for tester in test_cases_cd:
+            sys.stdout.write(f'\n{load_to_cloud.PathNavigator.pwd(self.terminal.current_path)} $ {tester}\n')
+            self.terminal.execute_command(tester)
+
+    def test_ls(self):
+        test_cases_cd = test_cases['ls']
+
+        for tester in test_cases_cd:
+            sys.stdout.write(f'\n{load_to_cloud.PathNavigator.pwd(self.terminal.current_path)} $ {tester}\n')
+            self.terminal.execute_command(tester)
+
 
 if __name__ == '__main__':
-    with open('test_struct.json', 'r') as file:
-        test_cases = json.load(file)
-    file_tester = list(test_cases.items())[0]
-    _key,_ = file_tester
-    print(f'File tester: {_["name"]}', " ", f'ID: {_["id"]}')
-    del test_cases[_key]
-    creds = load_to_cloud.authorization(token_path="../token.json", credentials_path="../credentials.json")
-    files_involved =[]
-    for number_test, (key, value) in enumerate(test_cases.items(), start=1):
-        print(f'Path {number_test}: {value["path_parts"]}', " ", f'ID: {value["id"]}')
-        file = load_to_cloud.copy(creds,file_id=_["id"], path=value["path_parts"])
-        files_involved.append(file['id'])
-        print("\n")
-
-    print("")
-
-    for file_id in files_involved:
-        load_to_cloud.remove(creds, file_id)
+    unittest.main()
 
 
