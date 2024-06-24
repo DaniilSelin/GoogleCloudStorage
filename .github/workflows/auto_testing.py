@@ -1,11 +1,13 @@
 import json
 import unittest
-import sys
-import subprocess
 import load_to_cloud
-import logging
 import os
-from contextlib import redirect_stdout, redirect_stderr
+
+import os
+
+# Ensure test-reports directory exists
+if not os.path.exists('test-reports'):
+    os.makedirs('test-reports')
 
 # получаем тест кейсы
 with open("test_struct.json", "r") as test_struct:
