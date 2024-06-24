@@ -15,8 +15,10 @@ if not os.path.exists(results_file):
     with open(results_file, 'w'):
         pass  # Создание пустого файла
 
+# Определяем абсолютный путь к текущему файлу
+current_dir = os.path.dirname(os.path.abspath(__file__))
 # получаем тест кейсы
-with open("test_struct.json", "r") as test_struct:
+with open(os.path.join(current_dir, "test_struct.json"), "r") as test_struct:
     test_cases = json.load(test_struct)
 
 class Testing(unittest.TestCase):
