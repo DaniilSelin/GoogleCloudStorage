@@ -20,9 +20,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
+    - name: Create test-reports directory
+      run: mkdir -p test-reports
+
     - name: Run auto_testing.py
-      run: |
-        python auto_testing.py > test-reports/results.log
+      run: python auto_testing.py > test-reports/results.log
 
     - name: Upload test results
       uses: actions/upload-artifact@v2
