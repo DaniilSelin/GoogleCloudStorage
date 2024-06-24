@@ -31,8 +31,8 @@ class Testing(unittest.TestCase):
         # Инициализируем экземпляр GoogleCloudTerminal, если он еще не был инициализирован
         if cls.terminal is None:
             cls.terminal = load_to_cloud.GoogleCloudTerminal(
-                token_path=os.path.join(os.path.dirname(__file__), "../token.json"),
-                credentials_path=os.path.join(os.path.dirname(__file__), "../credentials.json")
+                token_path=os.path.join(os.path.dirname(__file__), "../../token.json"),
+                credentials_path=os.path.join(os.path.dirname(__file__), "../../credentials.json")
             )
 
         cls.test_cases = test_cases
