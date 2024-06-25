@@ -27,3 +27,8 @@ jobs:
           mkdir -p test-reports
           python .github/workflows/auto_testing.py > .github/workflows/test-reports/results.log
 
+      - name: Upload test results
+        uses: actions/upload-artifact@v2
+        with:
+          name: Test Results
+          path: .github/workflows/test-reports/results.log
