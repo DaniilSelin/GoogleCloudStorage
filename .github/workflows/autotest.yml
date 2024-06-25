@@ -26,3 +26,4 @@ jobs:
         run: |
           mkdir -p test-reports
           python .github/workflows/auto_testing.py > .github/workflows/test-reports/results.log
+
