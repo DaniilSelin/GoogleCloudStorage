@@ -21,6 +21,8 @@ jobs:
           pip install -r requirements.txt
 
       - name: Create token.json
+        env:
+          TOKEN_GOOGLE_API: ${{ secrets.TOKEN_GOOGLE_API }}
         run: python .github/workflows/use_secret.py
 
       - name: Show token.json with secret
