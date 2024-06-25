@@ -29,7 +29,8 @@ jobs:
         env:
           PYTHONPATH: /home/runner/work/GoogleCloudStorage/GoogleCloudStorage
         run: |
-          python .github/workflows/auto_testing.py
+          mkdir -p test-reports
+          python .github/workflows/auto_testing.py > .github/workflows/test-reports/results.log
 
       - name: Upload test results
         uses: actions/upload-artifact@v2
