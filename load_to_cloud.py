@@ -14,6 +14,7 @@ from requests import Response
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
+
 class GoogleCloudTerminal:
     # Статическая переменная для хранения учетных данных
     creds = None
@@ -394,7 +395,7 @@ class FileManager:
                     print(file['name'])
 
     @staticmethod
-    def mkdir(path, create_parents=False, start_path=None):
+    def mkdir(path, create_parents=False, start_path=None, called_directly=True):
         """
         Создает новую директорию по указанному пути.
 
@@ -433,7 +434,8 @@ class FileManager:
                 return None
 
 
-        print("Create path: ", path, name_path, parents_id)
+        if called_directly:
+            print("Create path: ", path, name_path, parents_id)
 
         # Создаем заголовок с авторизационным токеном
         headers = {
@@ -453,10 +455,12 @@ class FileManager:
         response = requests.post(url, headers=headers, json=body)
 
         if response.status_code == 200:
-            print('Create folber compleate')
+            if called_directly:
+                print('Create folber compleate')
             return response.json()['id']
         else:
-            print(f'error when creating folber: {response.status_code} - {response.text}')
+            if called_directly:
+                print(f'error when creating folber: {response.status_code} - {response.text}')
             return None
 
     @staticmethod
@@ -466,7 +470,7 @@ class FileManager:
 
     @staticmethod
     def cp(source: str, destination: str, recursive=False):
-        source_id = PathNavigator.validate_path(source, GoogleCloudTerminal.current_path)
+        source_id = PathNavigator.validate_path(source, GoogleCloudTerminal.current_path, check_file=True)
         destination_id = PathNavigator.validate_path(destination, GoogleCloudTerminal.current_path)
         # проверяем корректность обоих путей
         if not source_id:
@@ -480,22 +484,50 @@ class FileManager:
         # копируем только этот файл
         file_source = FileManager.get_file_metadata(source_id)
 
-        if file_source['mimeType'] != 'application/vnd.google-apps.folder' or not recursive:
-            # это условие стоит перым, так как у не папки детей быть не может
-            if FileManager._copy_file(source_id, destination_id):
+        if file_source['mimeType'] == 'application/vnd.google-apps.folder' and not recursive:
+            if FileManager._copy_folder(file_source, destination_id):
+                print(f'Folder copied successfully to {destination}')
+        elif file_source['mimeType'] != 'application/vnd.google-apps.folder' and recursive:
+            # так как у не папки детей быть не может, а лишняя предосторожность не помешает
+            if FileManager._copy_file(file_source, destination_id):
                 print(f'File copied successfully to {destination}')
         else:
-            if FileManager._copy_directory(source_id, destination_id):
+            if FileManager._copy_directory(file_source, destination_id):
                 print(f'Recursive files copied successfully to {destination}')
 
     @staticmethod
-    def _copy_file(source_id, destination_id):
+    def _copy_folder(source, destination_id):
+        # Создаем папку, так как нельз их копировать...
+        headers = {
+            'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
+            'Content-Type': 'application/json',
+        }
+
+        # URL запроса для получения списка файлов Google Drive API v3
+        url = 'https://www.googleapis.com/drive/v3/files'
+
+        # Если имя отсавить без изменений то у нас появиться два одинковых пути
+        body = {
+            "name": f"Copy of {source['name']}",
+            "mimeType": "application/vnd.google-apps.folder",
+            'parents': [destination_id]
+        }
+
+        response = requests.post(url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return None
+
+    @staticmethod
+    def _copy_file(source, destination_id):
         # Реализация копирования одного файла
         headers = {
             'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
             'Content-Type': 'application/json',
         }
-        url = f'https://www.googleapis.com/drive/v3/files/{source_id}/copy'
+        url = f'https://www.googleapis.com/drive/v3/files/{source["id"]}/copy'
         body = {
             'parents': [destination_id]
         }
@@ -507,8 +539,10 @@ class FileManager:
             return None
 
     @staticmethod
-    def _copy_directory(source_id, destination_id):
-        needed_copy = PathNavigator.gather_structure_copy(source_id)
+    def _copy_directory(source, destination_id):
+        destination_id = FileManager._copy_folder(source, destination_id)['id']
+
+        needed_copy = PathNavigator.gather_structure_copy(source['id'])
 
         iterator = iter(needed_copy)
 
@@ -517,8 +551,14 @@ class FileManager:
 
             if file == "!":
                 next_file = next(iterator, None)
-                next_file = FileManager._copy_file(next_file, destination_id)
-                destination_id = next_file['id']
+                if not next_file:
+                    break
+                elif next_file == "?":
+                    file = "?"
+                else:
+                    next_file = FileManager._copy_folder(next_file, destination_id)
+                    destination_id = next_file['id']
+                    continue
 
             if file == "?":
                 previous_file = FileManager.get_file_metadata(destination_id)
@@ -737,11 +777,11 @@ class PathNavigator:
         subfiles = []
 
         for file in all_files:
-            if file['parents'][0] == source_id:
+            if 'parents' in file and file['parents'][0] == source_id:
                 if file['mimeType'] == 'application/vnd.google-apps.folder':
                     # ОЧень похоже на поиск в глубину (алгоритм DFS)
                     subfiles = (subfiles + ["!"] + [file] +
-                                PathNavigator.gather_structure_copy(file['id']) + ["?"])
+                                PathNavigator.gather_structure_copy(file['id']) + ["!"])
                 else:
                     subfiles.append(file)
 
@@ -938,6 +978,7 @@ class UserInterface:
 
 
 if __name__ == '__main__':
+    # cp ./folder1 ./ -r
 
     terminal = GoogleCloudTerminal()
 

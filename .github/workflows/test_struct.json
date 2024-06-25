@@ -5,6 +5,9 @@
         "cd ~/LoadCloud",
         "cd ~/"
     ],
+    "cp": [
+        "cp ./LoadCloud ./LoadCloud/folder2/folder"
+    ],
     "ls": [
         "ls ~/",
         "ls ~/LoadCloud",
@@ -18,6 +21,7 @@
         "mkdir ./LoadCloud/folder1/folder -p"
     ],
     "rm": [
+        "rm './LoadCloud/folder2/folder/Copy of LoadCloud'",
         "rm ./LoadCloud/folder2/folder",
         "rm ./LoadCloud/folder1/folder",
         "rm ./LoadCloud/folder2",
