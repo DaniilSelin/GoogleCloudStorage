@@ -1,9 +1,12 @@
 import json
 import unittest
-import load_to_cloud
 import os
+import sys
 
-import os
+# Добавьте текущую рабочую директорию в sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
+import load_to_cloud
 
 # ест ли у нас директория для логов?
 if not os.path.exists('test-reports'):
@@ -20,6 +23,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 # получаем тест кейсы
 with open(os.path.join(current_dir, "test_struct.json"), "r") as test_struct:
     test_cases = json.load(test_struct)
+
 
 class Testing(unittest.TestCase):
     terminal = None
