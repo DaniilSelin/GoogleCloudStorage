@@ -23,6 +23,9 @@ jobs:
       - name: Create token.json
         run: echo "${{ secrets.TOKEN_GOOGLE_API }}" > ./token.json
 
+      - name: Where i am?
+        run: ls -1
+
       - name: Show token.json with secret
         run: cat ./token.json
 
