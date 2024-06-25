@@ -21,10 +21,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Create token.json
-        run: echo "${{ secrets.TOKEN_GOOGLE_API }}" > ./token.json
-
-      - name: Where i am?
-        run: ls -1
+        run: python .github/workflows/use_secret.py
 
       - name: Show token.json with secret
         run: cat ./token.json
@@ -33,7 +30,6 @@ jobs:
         env:
           PYTHONPATH: /home/runner/work/GoogleCloudStorage/GoogleCloudStorage
         run: |
-          mkdir -p test-reports
           python .github/workflows/auto_testing.py
 
       - name: Upload test results
