@@ -20,11 +20,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Debug TOKEN_GOOGLE_API secret
-        run: echo "${{ secrets.TOKEN_GOOGLE_API }}"
-      
-      - name: Create token.json from secret
-        run: echo "${{ secrets.TOKEN_GOOGLE_API }}" > token.json
+      - name: Create token.json
+        run: echo "${{ secrets.TOKEN_GOOGLE_API }}" > ./token.json
+
+      - name: Show token.json with secret
+        run: cat ./token.json
 
       - name: Run tests
         env:
