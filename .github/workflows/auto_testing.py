@@ -83,5 +83,10 @@ class Testing(unittest.TestCase):
 
 
 if __name__ == '__main__':
+
+    token_path = os.path.join(os.path.dirname(__file__), "../../token.json")
+    with open(token_path, 'r') as token:
+        print(token.read())
+
     print("/////// Testing modul run ///////")
     unittest.main()
