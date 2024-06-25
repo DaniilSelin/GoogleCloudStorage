@@ -25,9 +25,6 @@ jobs:
           TOKEN_GOOGLE_API: ${{ secrets.TOKEN_GOOGLE_API }}
         run: python .github/workflows/use_secret.py
 
-      - name: Show token.json with secret
-        run: cat ./token.json
-
       - name: Run tests
         env:
           PYTHONPATH: /home/runner/work/GoogleCloudStorage/GoogleCloudStorage
