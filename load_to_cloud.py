@@ -174,10 +174,8 @@ class GoogleCloudTerminal:
         Args:
             args: Аргументы для команды 'cp'.
         """
-        try:
-            FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
-        except Exception:
-            print("Error: ls called except")
+        FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
+
 
     def remove(self, args):
         """
@@ -447,9 +445,6 @@ class FileManager:
                 print("Path is incorrect")
                 return None
 
-        if called_directly:
-            print("Create path: ", path, name_path, parents_id)
-
         # Создаем заголовок с авторизационным токеном
         headers = {
             'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
@@ -461,10 +456,15 @@ class FileManager:
 
         # Проверяем есть ли в destination_id папки с таким же именем
         lst = [child['name'] for child in PathNavigator.get_child_files(parents_id)]
-        count_names = lst.count(name_path)
 
-        if count_names:
-            name_path = f"{name_path}_{count_names}"
+        while lst.count(name_path):
+
+            name_path = f"Copy of {name_path}"
+
+            lst = [child['name'] for child in PathNavigator.get_child_files(parents_id)]
+
+        if called_directly:
+            print("Create path: ", path, ", parents path id: ", parents_id)
 
         body = {
             "name": name_path,
@@ -530,10 +530,11 @@ class FileManager:
 
         # Проверяем есть ли в destination_id папки с таким же именем
         lst = [child['name'] for child in PathNavigator.get_child_files(destination_id)]
-        count_names = lst.count(name_copy_folder)
 
-        if count_names:
-            name_copy_folder = f"{count_names+1} copy of {source['name']}"
+        while lst.count(name_copy_folder):
+            name_copy_folder = f"Copy of {name_copy_folder}"
+
+            lst = [child['name'] for child in PathNavigator.get_child_files(destination_id)]
 
         # Если имя отсавить без изменений то у нас появиться два одинковых пути
         body = {
@@ -589,11 +590,12 @@ class FileManager:
                     destination_id = next_file['id']
                     continue
 
-            if file == "?":
+            elif file == "?":
                 previous_file = FileManager.get_file_metadata(destination_id)
                 destination_id = previous_file['parents'][0]
 
-            FileManager._copy_file(file, destination_id)
+            else:
+                FileManager._copy_file(file, destination_id)
 
         return True
 
@@ -623,10 +625,11 @@ class FileManager:
             response = None
 
             # пропускаем все сигналы ! и ?
-            while not isinstance(file_remove, str):
+            while isinstance(file_remove, str):
                 file_remove = next(remove_files_struct, None)
-                if not file_remove:
-                    break
+
+            if not file_remove:
+                break
 
             if verbose:
                 print(f"I'll trying delete: {file_remove['name']} ({mimetypes.guess_extension(file_remove['mimeType'])}): {file_remove['id']}")
@@ -937,9 +940,9 @@ class PathNavigator:
         for file in all_files:
             if 'parents' in file and file['parents'][0] == source_id:
                 if file['mimeType'] == 'application/vnd.google-apps.folder':
-                    # ОЧень похоже на поиск в глубину (алгоритм DFS)
+                    # ОЧень похоже на поиск в глубину (алгоритм DFS) !->?
                     subfiles = (subfiles + ["!"] + [file] +
-                                PathNavigator.gather_structure(file['id']) + ["!"])
+                                PathNavigator.gather_structure(file['id']) + ["?"])
                 else:
                     subfiles.append(file)
 
