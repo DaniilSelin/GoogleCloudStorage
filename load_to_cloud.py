@@ -3,6 +3,7 @@ import sys
 from typing import Any
 import argparse
 import re
+import mimetypes
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -13,6 +14,20 @@ import requests
 from requests import Response
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
+
+
+class ResponseTeg:
+    def __init__(self, text, status_code):
+        self.text_response = text
+        self.status_code_response = status_code
+
+    @property
+    def text(self):
+        return self.text_response
+
+    @property
+    def status_code(self):
+        return self.status_code_response
 
 
 class GoogleCloudTerminal:
@@ -159,12 +174,10 @@ class GoogleCloudTerminal:
         Args:
             args: Аргументы для команды 'cp'.
         """
-        FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
-        """
         try:
             FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
         except Exception:
-            print("Error: ls called except")"""
+            print("Error: ls called except")
 
     def remove(self, args):
         """
@@ -172,7 +185,7 @@ class GoogleCloudTerminal:
         Args:
             args: Аргументы для команды 'rm'.
         """
-        FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose)
+        FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose, interactive=args.interactive)
 
 
 class FileManager:
@@ -402,6 +415,7 @@ class FileManager:
         Args:
             path (str): Путь к новой директории.
             create_parents (bool): Если True, создаются все необходимые родительские директории.
+            called_directly (bool): Вызвана ли функция напрямую пользовтателем
         """
 
         if create_parents:
@@ -433,7 +447,6 @@ class FileManager:
                 print("Path is incorrect")
                 return None
 
-
         if called_directly:
             print("Create path: ", path, name_path, parents_id)
 
@@ -445,6 +458,13 @@ class FileManager:
 
         # URL запроса для получения списка файлов Google Drive API v3
         url = 'https://www.googleapis.com/drive/v3/files'
+
+        # Проверяем есть ли в destination_id папки с таким же именем
+        lst = [child['name'] for child in PathNavigator.get_child_files(parents_id)]
+        count_names = lst.count(name_path)
+
+        if count_names:
+            name_path = f"{name_path}_{count_names}"
 
         body = {
             "name": name_path,
@@ -506,9 +526,18 @@ class FileManager:
         # URL запроса для получения списка файлов Google Drive API v3
         url = 'https://www.googleapis.com/drive/v3/files'
 
+        name_copy_folder = f"Copy of {source['name']}"
+
+        # Проверяем есть ли в destination_id папки с таким же именем
+        lst = [child['name'] for child in PathNavigator.get_child_files(destination_id)]
+        count_names = lst.count(name_copy_folder)
+
+        if count_names:
+            name_copy_folder = f"{count_names+1} copy of {source['name']}"
+
         # Если имя отсавить без изменений то у нас появиться два одинковых пути
         body = {
-            "name": f"Copy of {source['name']}",
+            "name": name_copy_folder,
             "mimeType": "application/vnd.google-apps.folder",
             'parents': [destination_id]
         }
@@ -542,7 +571,7 @@ class FileManager:
     def _copy_directory(source, destination_id):
         destination_id = FileManager._copy_folder(source, destination_id)['id']
 
-        needed_copy = PathNavigator.gather_structure_copy(source['id'])
+        needed_copy = PathNavigator.gather_structure(source['id'])
 
         iterator = iter(needed_copy)
 
@@ -569,24 +598,153 @@ class FileManager:
         return True
 
     @staticmethod
-    def rm(path, recursive, verbose):
+    def _remove_file(id_remove):
 
-        needed_remove = PathNavigator.validate_path(path, GoogleCloudTerminal.current_path, check_file=True)
+        if PathNavigator.get_child_files(id_remove):
+            return ResponseTeg("Folder have child files", 403)
 
         headers = {
             'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}'
         }
 
         # URL запроса для удаления файла Google Drive API v3
-        url = f'https://www.googleapis.com/drive/v3/files/{needed_remove}'
+        url = f'https://www.googleapis.com/drive/v3/files/{id_remove}'
 
         response = requests.delete(url, headers=headers)
 
-        if response.status_code == 204:
-            print('Delete compleate')
-        else:
-            print(f'error when deleting file: {response.status_code} - {response.text}')
+        return response
+
+    @staticmethod
+    def _recursive_remove_branch(verbose, interactive, remove_files_struct):
+
+        remove_files_struct = iter(remove_files_struct[::-1])
+
+        for file_remove in remove_files_struct:
+            response = None
+
+            if isinstance(file_remove, str):
+                file_remove = next(remove_files_struct, None)
+
+                if not file_remove:
+                    break
+
+            if verbose:
+                print(f"I'll trying delete: {file_remove['name']} ({mimetypes.guess_extension(file_remove['mimeType'])}): {file_remove['id']}")
+
+            if interactive:
+                if FileManager._confirm_action(file_remove['name']):
+                    print("The action is confirmed. We continue the execution. ")
+                    response = FileManager._remove_file(file_remove['id'])
+                else:
+                    print("The action has been canceled. ")
+                    continue
+            else:
+                response = FileManager._remove_file(file_remove['id'])
+
+            if response.status_code == 204:
+                print(f"{file_remove['name']} delete complete")
+            else:
+                print(f'error when deleting file: {response.status_code} - {response.text}')
+
+    @staticmethod
+    def _confirm_action(name_file):
+        while True:
+            response = input(f"Are you sure you want to delete this file: {name_file}? (yes/no): ").strip().lower()
+            if response in ('yes', 'y'):
+                return True
+            elif response in ('no', 'n'):
+                return False
+            else:
+                print("Please enter 'yes' or 'no' to confirm.")
+
+    @staticmethod
+    def rm(path, recursive, verbose, interactive):
+
+        id_remove = PathNavigator.validate_path(path, GoogleCloudTerminal.current_path, check_file=True)
+        file_remove_root = FileManager.get_file_metadata(id_remove)
+
+        if not id_remove:
             return None
+
+        # папку без рекурсиваного удаления, удалять нельзя
+        if file_remove_root['mimeType'] == 'application/vnd.google-apps.folder':
+            remove_files_struct = PathNavigator.gather_structure(id_remove)
+
+            if not recursive and not remove_files_struct:
+                response = None
+
+                if interactive:
+                    if FileManager._confirm_action(file_remove_root['name']):
+                        print("The action is confirmed. We continue the execution. ")
+                        response = FileManager._remove_file(id_remove)
+                    else:
+                        print("The action has been canceled. ")
+                        return
+
+                else:
+                    if verbose:
+                        print(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
+
+                    response = FileManager._remove_file(id_remove)
+
+                if response.status_code == 204:
+                    print(f"{file_remove_root['name']} delete complete")
+                else:
+                    print(f'error when deleting file: {response.status_code} - {response.text}')
+
+            elif recursive:
+                response = None
+
+                if verbose:
+                    print(f"folder ({file_remove_root['name']}) have child files, i'll try to delete them.")
+                    print(f"I'm starting to clean the branch")
+
+                # чистим ветку
+                FileManager._recursive_remove_branch(verbose, interactive, remove_files_struct)
+
+                if verbose:
+                    print(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
+
+                if interactive:
+                    if FileManager._confirm_action(file_remove_root['name']):
+                        print("The action is confirmed. We continue the execution. ")
+                        response = FileManager._remove_file(id_remove)
+                    else:
+                        print("The action has been canceled. ")
+                        return
+                else:
+                    # удаляем корень очищенной ветки
+                    response = FileManager._remove_file(id_remove)
+
+                if response.status_code == 204:
+                    print(f"{file_remove_root['name']} delete complete")
+                    print(f'Recursive deletion is complete')
+                else:
+                    print(f'error when deleting file: {response.status_code} - {response.text}')
+            else:
+                print(f'error when deleting file: This folder have child files')
+
+        else:
+            response = None
+
+            if interactive:
+                if FileManager._confirm_action(file_remove_root['name']):
+                    print("The action is confirmed. We continue the execution. ")
+                    response = FileManager._remove_file(id_remove)
+                else:
+                    print("The action has been canceled. ")
+                    return
+
+            else:
+                if verbose:
+                    print(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
+
+                response = FileManager._remove_file(id_remove)
+
+            if response.status_code == 204:
+                print(f"{file_remove_root['name']} delete complete")
+            else:
+                print(f'error when deleting file: {response.status_code} - {response.text}')
 
 
 class PathNavigator:
@@ -757,7 +915,7 @@ class PathNavigator:
         return {"start_path": start_path, "path_to_create": path_to_create[::-1]}
 
     @staticmethod
-    def gather_structure_copy(source_id: str):
+    def gather_structure(source_id: str):
         """
         Выделяет всю ветку начная с файла source и заканчивая всеми путями исходящими из него.
 
@@ -781,11 +939,31 @@ class PathNavigator:
                 if file['mimeType'] == 'application/vnd.google-apps.folder':
                     # ОЧень похоже на поиск в глубину (алгоритм DFS)
                     subfiles = (subfiles + ["!"] + [file] +
-                                PathNavigator.gather_structure_copy(file['id']) + ["!"])
+                                PathNavigator.gather_structure(file['id']) + ["!"])
                 else:
                     subfiles.append(file)
 
         return subfiles
+
+    @staticmethod
+    def get_child_files(source_id: str):
+        """
+        Выделяет все файлы лежащие в source_id
+
+        Args:
+            source_id (str): Родительская папка.
+
+        Returns:
+            list_child: список файлов находящихся в каталоге source_id.
+        """
+        all_files = FileManager.get_list_of_files(called_directly=False)
+        list_child = []
+
+        for file in all_files:
+            if 'parents' in file and file['parents'][0] == source_id:
+                list_child.append(file)
+
+        return list_child
 
 
 class CommandParser:
@@ -939,8 +1117,9 @@ class CommandParser:
     def parse_args_rm(args):
         parser = argparse.ArgumentParser(description="Remove file from source to destination. ")
         parser.add_argument('path', nargs="?", default=None, help='Path file that needs delete. ')
-        parser.add_argument('-r', '--recursive', action='store_true', help="The need to recursively delete the contents of the directory. ")
+        parser.add_argument('-r', '--recursive', action='store_true', help="Recursively delete the contents of the directory. ")
         parser.add_argument('-v', '--verbose', action='store_true', help="Show information about remove files. ")
+        parser.add_argument("-i", '--interactive', action='store_true', help="Prompt before every removal.")
 
         try:
             # Проверка на наличие --help или -h
@@ -979,6 +1158,7 @@ class UserInterface:
 
 if __name__ == '__main__':
     # cp ./folder1 ./ -r
+    # rm "./Copy of folder1" -r
 
     terminal = GoogleCloudTerminal()
 
