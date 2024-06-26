@@ -622,9 +622,9 @@ class FileManager:
         for file_remove in remove_files_struct:
             response = None
 
-            if isinstance(file_remove, str):
+            # пропускаем все сигналы ! и ?
+            while not isinstance(file_remove, str):
                 file_remove = next(remove_files_struct, None)
-
                 if not file_remove:
                     break
 
