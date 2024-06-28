@@ -16,6 +16,100 @@ from requests import Response
 SCOPES = ['https://www.googleapis.com/auth/drive']
 
 
+class BiDict:
+    """ Структура данных чем то похожая на  би-биектное отображение,
+        Ныжна для взаимного отображения mimeType и расширения"""
+    def __init__(self):
+        # mimeType -> Extension
+        self.forward = {
+            # Документы Google
+            "application/vnd.google-apps.document": ".gdoc",
+            "application/vnd.google-apps.spreadsheet": ".gsheet",
+            "application/vnd.google-apps.presentation": ".gslides",
+            "application/vnd.google-apps.form": ".gform",
+            "application/vnd.google-apps.drawing": ".gdraw",
+            "application/vnd.google-apps.map": ".gmap",
+
+            # Другие файлы Google
+            "application/vnd.google-apps.site": ".gsite",
+            "application/vnd.google-apps.script": ".gsheet",
+            "application/vnd.google-apps.fusiontable": ".gtable",
+            "application/vnd.google-apps.jam": ".jam",
+            "application/vnd.google-apps.shortcut": ".shortcut",
+
+            #Файлы других форматов
+            "application/vnd.google-apps.folder": "",
+            "application/octet-stream": ".bin",
+            "text/plain": ".txt",
+            "image/jpeg": ".jpeg",
+            "image/png": ".png",
+            "image/gif": ".gif",
+            "video/mp4": ".mp4",
+            "video/x-msvideo": ".avi",
+            "audio/mpeg": ".mp3",
+            "audio/x-wav": ".wav",
+            "application/pdf": ".pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+            "application/zip": ".zip"
+        }
+        # Extension -> mimeType
+        self.backward = {
+                    ".gdoc": "application/vnd.google-apps.document",
+                    ".gsheet": "application/vnd.google-apps.spreadsheet",
+                    ".gslides": "application/vnd.google-apps.presentation",
+                    ".gform": "application/vnd.google-apps.form",
+                    ".gdraw": "application/vnd.google-apps.drawing",
+                    ".gmap": "application/vnd.google-apps.map",
+                    ".gsite": "application/vnd.google-apps.site",
+                    ".gsheet": "application/vnd.google-apps.script",
+                    ".gtable": "application/vnd.google-apps.fusiontable",
+                    ".jam": "application/vnd.google-apps.jam",
+                    ".shortcut": "application/vnd.google-apps.shortcut",
+                    "": "application/vnd.google-apps.folder",
+                    ".bin": "application/octet-stream",
+                    ".txt": "text/plain",
+                    ".jpeg": "image/jpeg",
+                    ".png": "image/png",
+                    ".gif": "image/gif",
+                    ".mp4": "video/mp4",
+                    ".avi": "video/x-msvideo",
+                    ".mp3": "audio/mpeg",
+                    ".wav": "audio/x-wav",
+                    ".pdf": "application/pdf",
+                    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    ".zip": "application/zip"
+                }
+
+    def add(self, key, value):
+        if key in self.forward or value in self.backward:
+            raise ValueError("Duplicate key or value")
+        self.forward[key] = value
+        self.backward[value] = key
+
+    def get_by_key(self, key):
+        try:
+            return self.forward.get(key)
+        except KeyError:
+            print("This mimeType is not extension")
+            print("Extensions mimeType: ")
+            print(PathNavigator.get_mime_description())
+
+    def get_by_value(self, value):
+        try:
+            return self.backward.get(value)
+        except KeyError:
+            print("This extension is not extension")
+            print("Extensions extension: ")
+            print(PathNavigator.get_mime_description())
+
+    def __repr__(self):
+        return f'BiDict(mimeType<->Extension)'
+
+
 class ResponseTeg:
     def __init__(self, text, status_code):
         self.text_response = text
@@ -109,6 +203,10 @@ class GoogleCloudTerminal:
             return self.copy(args)
         elif command == 'rm':
             return self.remove(args)
+        elif command == 'touch':
+            return self.touch(args)
+        elif command == 'mimeType':
+            return self.mimeType()
         else:
             print(f"Unknown command: {command}")
         """
@@ -176,7 +274,6 @@ class GoogleCloudTerminal:
         """
         FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
 
-
     def remove(self, args):
         """
         Метод для удаления файлов/директорий
@@ -184,6 +281,19 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'rm'.
         """
         FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose, interactive=args.interactive)
+
+    def touch(self, args):
+        """
+        Метод для создания файлов
+        Args:
+            args: Аргументы для команды 'touch'.
+        """
+        FileManager.touch(path=args.path,
+                          mimeType=args.mimeType,
+                          time_modification=args.modification)
+
+    def mimeType(self):
+        FileManager.mimeType()
 
 
 class FileManager:
@@ -484,9 +594,109 @@ class FileManager:
             return None
 
     @staticmethod
-    def touch(path):
+    def _m_touch(path):
+        import datetime
+
+        if not path:
+            print("File name is not specified. ")
+            return
+
+        file_id = PathNavigator.validate_path(path,current_path=GoogleCloudTerminal.current_path, check_file=True)
+
+        if not file_id:
+            print("Paths is incorrect")
+            return
+
+        # Метод для обновления временных меток файла в Google Drive
+        headers = {
+            'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
+            'Content-Type': 'application/json'
+        }
+
+        url = f'https://www.googleapis.com/drive/v3/files/{file_id}'
+
+        # Получаем текущее время в формате UTC без дробной части секунд
+        modified_time = datetime.datetime.utcnow().replace(microsecond=0).isoformat() + 'Z'
+
+        body = {
+            'modifiedTime': modified_time
+        }
+
+        response = requests.patch(url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f'Failed to update file times. Status code: {response.status_code}: {response.text}')
+            return None
+
+    @staticmethod
+    def touch(path, mimeType, time_modification):
+
+        # Словарь для выбора функции
+        actions = {
+            'time_modification': FileManager._m_touch,
+        }
+
+        # Найти первый истинный параметр и вызвать соответствующую функцию
+        for action, func in actions.items():
+            if locals()[action]:  # Проверить, если параметр истинный
+                func(path)
+                return
+
+        path = re.sub('\n', "", path)
+
+        path = path.strip("/").split("/")
+
+        name_file = path[-1]
+
+        path = "/".join(path[:-1])
+
+        if not path:
+            parents_id = GoogleCloudTerminal.current_path
+
+        else:
+            parents_id = PathNavigator.validate_path(path)
+
+        if not parents_id:
+            print("Path is incorrect")
+            return None
+
+        if not name_file:
+            print("Ur forgot give me name new filee")
+
+        # Проверяем есть ли в destination_id папки с таким же именем
+        lst = [child['name'] for child in PathNavigator.get_child_files(parents_id)]
+
+        while lst.count(name_file):
+            print(f"Name: {name_file} is occupied. ")
+            name_file = f"Copy of {name_file}"
+            print(f"I'll try to create a file named {name_file}. ")
+            lst = [child['name'] for child in PathNavigator.get_child_files(parents_id)]
+
         # Метод для создания файла в Google Cloud
-        pass
+        headers = {
+            'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
+            'Content-Type': 'application/json'
+        }
+
+        url = f'https://www.googleapis.com/drive/v3/files'
+
+        body = {
+            "name": name_file,
+            'parents': [parents_id]
+        }
+
+        if mimeType:
+            body["mimeType"] = mimeType
+
+        response = requests.post(url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f'Failed then create file. Status code: {response.status_code}')
+            return None
 
     @staticmethod
     def cp(source: str, destination: str, recursive=False):
@@ -740,7 +950,7 @@ class FileManager:
 
             else:
                 if verbose:
-                    print(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
+                    print(f"I'll trying delete: {file_remove_root['name']} ({mimetypes.guess_extension(file_remove_root['mimeType'])}): {file_remove_root['id']}")
 
                 response = FileManager._remove_file(id_remove)
 
@@ -748,6 +958,11 @@ class FileManager:
                 print(f"{file_remove_root['name']} delete complete")
             else:
                 print(f'error when deleting file: {response.status_code} - {response.text}')
+
+    @staticmethod
+    def mimeType():
+        for mime in PathNavigator.get_mime_description():
+            print(f"{mime['mime']} ({mime['extension']}): {mime['description']}")
 
 
 class PathNavigator:
@@ -968,6 +1183,47 @@ class PathNavigator:
 
         return list_child
 
+    @staticmethod
+    def get_mime_description():
+        mime_info = [
+            {"mime": "application/vnd.google-apps.document", "extension": ".gdoc",
+             "description": "Google Docs document"},
+            {"mime": "application/vnd.google-apps.spreadsheet", "extension": ".gsheet",
+             "description": "Google Sheets spreadsheet"},
+            {"mime": "application/vnd.google-apps.presentation", "extension": ".gslides",
+             "description": "Google Slides presentation"},
+            {"mime": "application/vnd.google-apps.form", "extension": ".gform", "description": "Google Forms form"},
+            {"mime": "application/vnd.google-apps.drawing", "extension": ".gdraw",
+             "description": "Google Drawings drawing"},
+            {"mime": "application/vnd.google-apps.map", "extension": ".gmap", "description": "Google My Maps map"},
+            {"mime": "application/vnd.google-apps.site", "extension": ".gsite", "description": "Google Sites site"},
+            {"mime": "application/vnd.google-apps.script", "extension": ".gsheet", "description": "Google Apps Script"},
+            {"mime": "application/vnd.google-apps.fusiontable", "extension": ".gtable",
+             "description": "Google Fusion Tables table"},
+            {"mime": "application/vnd.google-apps.jam", "extension": ".jam", "description": "Google Jamboard jam"},
+            {"mime": "application/vnd.google-apps.shortcut", "extension": ".shortcut",
+             "description": "Google Shortcuts shortcut"},
+            {"mime": "application/vnd.google-apps.folder", "extension": "", "description": "Google Drive folder"},
+            {"mime": "application/octet-stream", "extension": ".bin", "description": "Binary file"},
+            {"mime": "text/plain", "extension": ".txt", "description": "Plain text file"},
+            {"mime": "image/jpeg", "extension": ".jpeg", "description": "JPEG image file"},
+            {"mime": "image/png", "extension": ".png", "description": "PNG image file"},
+            {"mime": "image/gif", "extension": ".gif", "description": "GIF image file"},
+            {"mime": "video/mp4", "extension": ".mp4", "description": "MP4 video file"},
+            {"mime": "video/x-msvideo", "extension": ".avi", "description": "AVI video file"},
+            {"mime": "audio/mpeg", "extension": ".mp3", "description": "MP3 audio file"},
+            {"mime": "audio/x-wav", "extension": ".wav", "description": "WAV audio file"},
+            {"mime": "application/pdf", "extension": ".pdf", "description": "PDF file"},
+            {"mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "extension": ".docx",
+             "description": "Microsoft Word document"},
+            {"mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "extension": ".xlsx",
+             "description": "Microsoft Excel spreadsheet"},
+            {"mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation", "extension": ".pptx",
+             "description": "Microsoft PowerPoint presentation"},
+            {"mime": "application/zip", "extension": ".zip", "description": "ZIP archive"}
+        ]
+        return mime_info
+
 
 class CommandParser:
     """
@@ -997,6 +1253,8 @@ class CommandParser:
             'mkdir': CommandParser.parse_args_mkdir,
             'cp': CommandParser.parse_args_cp,
             'rm': CommandParser.parse_args_rm,
+            'touch': CommandParser.parse_args_touch,
+            'mimeType': CommandParser.parse_args_mimeType,
         }
 
         parts = shlex.split(input_string)  # Используем shlex для разбора строки
@@ -1141,6 +1399,53 @@ class CommandParser:
             print(f'Error when parse args command rm: {e}')
             return None
 
+    @staticmethod
+    def parse_args_touch(args):
+        parser = argparse.ArgumentParser(description="Create file or update metadata file. ")
+        parser.add_argument('path', nargs="?", default=None, help='Path file that needs create. ')
+        parser.add_argument('-m', '--modification', action='store_true',
+                            help="Update the modification time only. Exampl: 2024-06-28T15:30:00Z")
+        parser.add_argument('--mimeType', type=str,
+                            help="Specify the MIME type for the file being created. Format: --mimeType=<mime-type-string>. If u didn't know mimeType use command: mimeType")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            print(f'Error when parse args command touch: {e}')
+            return None
+
+    @staticmethod
+    def parse_args_mimeType(args):
+        parser = argparse.ArgumentParser(description="Info adout mimeType and extension. ")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            print(f'Error when parse args command mimeType: {e}')
+            return None
+
 
 class UserInterface:
     def __init__(self):
@@ -1160,8 +1465,7 @@ class UserInterface:
 
 
 if __name__ == '__main__':
-    # cp ./folder1 ./ -r
-    # rm "./Copy of folder1" -r
+    # touch ~/folder1/file.gsheet
 
     terminal = GoogleCloudTerminal()
 

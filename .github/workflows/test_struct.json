@@ -16,6 +16,11 @@
         "ls ~/LoadCloud/folder1/folder",
         "ls ~/LoadCloud/folder2/folder"
     ],
+    "touch": [
+        "touch ~LoadCloud/file.pdf",
+        "touch ~LoadCloud/file_2 --mimeType=application/vnd.google-apps.drawing",
+        "touch ~/LoadCloud/file.pdf -m"
+    ],
     "mkdir":[
         "mkdir ./LoadCloud/folder2/folder -p",
         "mkdir ./LoadCloud/folder1/folder -p"

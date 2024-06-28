@@ -88,6 +88,13 @@ class Testing(unittest.TestCase):
             print(f'\n{load_to_cloud.PathNavigator.pwd(self.terminal.current_path)} $ {tester}')
             self.terminal.execute_command(tester)
 
+    def test_touch(self):
+        test_cases_cd = test_cases['touch']
+
+        for tester in test_cases_cd:
+            print(f'\n{load_to_cloud.PathNavigator.pwd(self.terminal.current_path)} $ {tester}')
+            self.terminal.execute_command(tester)
+
 
 if __name__ == '__main__':
     print("/////// Testing modul run ///////")
