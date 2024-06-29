@@ -1,9 +1,10 @@
 import os
 import sys
-from typing import Any
+import json
 import argparse
 import re
 import mimetypes
+import webbrowser
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -111,6 +112,7 @@ class BiDict:
 
 
 class ResponseTeg:
+    """ Имммитация ответа от сервера """
     def __init__(self, text, status_code):
         self.text_response = text
         self.status_code_response = status_code
@@ -125,6 +127,12 @@ class ResponseTeg:
 
 
 class GoogleCloudTerminal:
+    """
+    Основной класс для связи между UserInterface и FileManager
+
+    Этот класс содержит отвечает за авторизацию пользователя,
+    Вызывает нужный метод из FileManager в зависимости от сообщение UserInterface
+    """
     # Статическая переменная для хранения учетных данных
     creds = None
     # Статическая переменная для хранения идентификатора корня
@@ -132,7 +140,7 @@ class GoogleCloudTerminal:
     # положение пользователя
     current_path = MyDriveID
 
-    def __init__(self, token_path="token.json", credentials_path="credentials.json"):
+    def __init__(self, token_path="encryption/token.json", credentials_path="encryption/credentials.json"):
         """
         Инициализирует GoogleCloudTerminal, устанавливает текущий путь и запускает авторизацию.
 
@@ -141,8 +149,8 @@ class GoogleCloudTerminal:
             credentials_path (str): Путь к файлу учетных данных.
         """
         # Чтобы это работало и на винде, подходи м к файлам по абсолютному пути
-        self.token_path = os.path.join(os.path.dirname(__file__), "./token.json")
-        self.credentials_path = os.path.join(os.path.dirname(__file__), "./credentials.json")
+        self.token_path = os.path.join(os.path.dirname(__file__), token_path)
+        self.credentials_path = os.path.join(os.path.dirname(__file__), credentials_path)
 
         #авто запуск авторизации
         self._autorization()
@@ -171,6 +179,17 @@ class GoogleCloudTerminal:
                     GoogleCloudTerminal.creds = None
 
             if not GoogleCloudTerminal.creds:
+                # Читаем содержимое файла credentials.json
+                with open(self.credentials_path) as f:
+                    try:
+                        cred_check = json.load(f)
+                    except json.JSONDecodeError as e:
+                        print(" Credentials not found, i trying decrypt them. ")
+                        from encryption import decrypt_credentials
+
+                        if decrypt_credentials.decrypt("encryption"):
+                            print("Credentials have been created, we continue the authorization process. ")
+
                 # создаем поток авторизации, то бишь получаем от имени моего ПО данные для авторизации в диске юзера
                 # собственно данные проекта, приложение, меня как разработчика лежат в credentials
                 # потом сразу пускаем на выбранном ОС порте (порт=0) сервер для прослушивания ответа от потока авторизации
@@ -180,6 +199,7 @@ class GoogleCloudTerminal:
                 # Сохраните учетные данные для следующего запуска.
                 with open(self.token_path, 'w') as token:
                     token.write(GoogleCloudTerminal.creds.to_json())
+
 
     def execute_command(self, input_string: str):
         """
@@ -205,6 +225,8 @@ class GoogleCloudTerminal:
             return self.remove(args)
         elif command == 'touch':
             return self.touch(args)
+        elif command == 'mv':
+            return self.move(args)
         elif command == 'mimeType':
             return self.mimeType()
         else:
@@ -292,11 +314,22 @@ class GoogleCloudTerminal:
                           mimeType=args.mimeType,
                           time_modification=args.modification)
 
+    def move(self, args):
+        FileManager.mv(
+            source_path=args.source_path,
+            destination_path=args.destination_path
+        )
+
     def mimeType(self):
         FileManager.mimeType()
 
 
 class FileManager:
+    """
+    Класс для работы с файлами.
+
+    Этот класс содержит все методы, которыми пользователь оперирует во время работы.
+    """
 
     @staticmethod
     def get_user_drive_id():
@@ -525,7 +558,6 @@ class FileManager:
             create_parents (bool): Если True, создаются все необходимые родительские директории.
             called_directly (bool): Вызвана ли функция напрямую пользовтателем
         """
-
         if create_parents:
             gather_needed = PathNavigator.gather_needed_paths(path)
             start_path, paths_to_create = gather_needed.values()
@@ -595,6 +627,12 @@ class FileManager:
 
     @staticmethod
     def _m_touch(path):
+        """
+        Обновляет время доступа к файл, НЕ СОЗДАЕТ НОВЫЙ.
+
+        Args:
+            path (str): Путь к файлу.
+        """
         import datetime
 
         if not path:
@@ -632,7 +670,14 @@ class FileManager:
 
     @staticmethod
     def touch(path, mimeType, time_modification):
+        """
+        Создает новую директорию по указанному пути.
 
+        Args:
+            path (str): Путь к новой директории.
+            mimeType (str): тип объекта, используется mimeType Google Cloud
+            time_modification (bool): Не создавать новый файл, а лишь обновить время доступа
+        """
         # Словарь для выбора функции
         actions = {
             'time_modification': FileManager._m_touch,
@@ -700,6 +745,14 @@ class FileManager:
 
     @staticmethod
     def cp(source: str, destination: str, recursive=False):
+        """
+        Копирует директории или файлы source в destination.
+
+        Args:
+            source (str): Путь к тому, что надо скопировать.
+            destination (str): Путь куда надо скопировать.
+            recursive (bool): Нужно ли копировать рекурсивно.
+        """
         source_id = PathNavigator.validate_path(source, GoogleCloudTerminal.current_path, check_file=True)
         destination_id = PathNavigator.validate_path(destination, GoogleCloudTerminal.current_path)
         # проверяем корректность обоих путей
@@ -727,6 +780,15 @@ class FileManager:
 
     @staticmethod
     def _copy_folder(source, destination_id):
+        """
+        Не подразумевает использованием напрямую пользователем.
+        Так как папку копировать нельзя, просто создаем новую.
+        Копирует только директорию source в destination.
+
+        Args:
+            source (dict): field объект google drive v3..
+            destination_id (str): id папки куда надо "скопировать" папку. Определяется еще в cp
+        """
         # Создаем папку, так как нельз их копировать...
         headers = {
             'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
@@ -762,6 +824,14 @@ class FileManager:
 
     @staticmethod
     def _copy_file(source, destination_id):
+        """
+        Не подразумевает использованием напрямую пользователем
+        Копирует только файл (не директорию) source в destination.
+
+        Args:
+            source (dict): field объект google drive v3..
+            destination_id (str): id папки куда надо скопировать. Определяется еще в cp
+        """
         # Реализация копирования одного файла
         headers = {
             'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
@@ -780,6 +850,14 @@ class FileManager:
 
     @staticmethod
     def _copy_directory(source, destination_id):
+        """
+        Не подразумевает использованием напрямую пользователем
+        Рекурсивно копирует файлы в директории source в destination.
+
+        Args:
+            source (dict): field объект google drive v3..
+            destination_id (str): id папки куда надо скопировать. Определяется еще в cp
+        """
         destination_id = FileManager._copy_folder(source, destination_id)['id']
 
         needed_copy = PathNavigator.gather_structure(source['id'])
@@ -811,7 +889,13 @@ class FileManager:
 
     @staticmethod
     def _remove_file(id_remove):
+        """
+        Не подразумевает использованием напрямую пользователем
+        Удаляет ровно один файл или папку, если у неё нет дочерних файлов.
 
+        Args:
+            id_remove (str): field объект google drive v3..
+        """
         if PathNavigator.get_child_files(id_remove):
             return ResponseTeg("Folder have child files", 403)
 
@@ -828,7 +912,17 @@ class FileManager:
 
     @staticmethod
     def _recursive_remove_branch(verbose, interactive, remove_files_struct):
+        """
+        Рекурсивно удаляет файлы директорию.
 
+        Args:
+            remove_files_struct (list): Результат метода PathNavigator.gather_structure()
+                                            Список обьектов field Google Drive v3
+                                            Содержит всю ветку начиная с директории, которую нужно рекурсивно удалить
+                                            САМ КОРЕНЬ ВЕТКИ НЕ СОДЕРЖИТ
+            verbose (bool): Выводить ли дополнительную информацию, о этапах рекусривного удаления файла.
+            interactive (bool): Запрашивать согласие перед каждым удалением файла, в случае отказа, файл не будет удлён.
+        """
         remove_files_struct = iter(remove_files_struct[::-1])
 
         for file_remove in remove_files_struct:
@@ -861,6 +955,12 @@ class FileManager:
 
     @staticmethod
     def _confirm_action(name_file):
+        """
+        Запрашивает подтверждение действия у пользователя.
+
+        Args:
+            name_file (str): Имя файла, над которым будет производиться действие.
+        """
         while True:
             response = input(f"Are you sure you want to delete this file: {name_file}? (yes/no): ").strip().lower()
             if response in ('yes', 'y'):
@@ -872,7 +972,15 @@ class FileManager:
 
     @staticmethod
     def rm(path, recursive, verbose, interactive):
+        """
+        Удаляет директорию или файл, путь к которму path.
 
+        Args:
+            path (str): Путь к тому, что надо удалить.
+            verbose (bool): Выводить ли дополнительную информацию, о этапах удаления файла.
+            interactive (bool): Запрашивать согласие перед каждым удалением файла, в случае отказа, файл не будет удлён.
+            recursive (bool): Каскадное удаление файлов в path.
+        """
         id_remove = PathNavigator.validate_path(path, GoogleCloudTerminal.current_path, check_file=True)
         file_remove_root = FileManager.get_file_metadata(id_remove)
 
@@ -960,12 +1068,69 @@ class FileManager:
                 print(f'error when deleting file: {response.status_code} - {response.text}')
 
     @staticmethod
+    def mv(source_path: str, destination_path: str):
+        """
+        НЕ РАБОТАЕТ ИЗ ЗА ПРИКОЛОВ GoogleDriveApi, исключение не вызывает.
+        Перемещает source_path в destination_path.
+
+        Args:
+            source_path (str): Путь к тому, что надо переместить.
+            destination_path (str): Путь куда ндо переместить.
+        """
+        source_id = PathNavigator.validate_path(source_path, current_path=GoogleCloudTerminal.current_path, check_file=True)
+        destination_id = PathNavigator.validate_path(destination_path, current_path=GoogleCloudTerminal.current_path)
+
+        if not source_id:
+            print("Source path is incorrect")
+            return
+
+        if not destination_id:
+            print("Destination path is incorrect")
+            return
+
+        source_metadata = FileManager.get_file_metadata(source_id)
+        print(source_metadata)
+
+        # Метод для обновления временных меток файла в Google Drive
+        headers = {
+            'Authorization': f'Bearer {GoogleCloudTerminal.creds.token}',
+            'Content-Type': 'application/json'
+        }
+
+        url = f'https://www.googleapis.com/drive/v3/files/{source_id}'
+
+        body = {
+            'removeParents': source_metadata.get("parents"),
+            'addParents': destination_id,
+            'fields': 'id, parents'  # Указываем поля, которые хотим получить в ответе
+        }
+
+        response = requests.patch(url, headers=headers, json=body)
+
+        source_metadata = FileManager.get_file_metadata(source_id)
+        print(source_metadata)
+        if response.status_code == 200:
+            print(response.json())
+            return response.json()
+        else:
+            print(f'Failed to move file times. Status code: {response.status_code}: {response.text}')
+            return None
+
+    @staticmethod
     def mimeType():
+        """
+        Функция для вывода списка mimeType и их расширений.
+        """
         for mime in PathNavigator.get_mime_description():
             print(f"{mime['mime']} ({mime['extension']}): {mime['description']}")
 
 
 class PathNavigator:
+    """
+    Класс для навигации по GoogleDrive, содержит методы для работы с путями
+
+        и выделением каких либо структур из драйвера.
+    """
     @staticmethod
     def validate_path(path: str, current_path=GoogleCloudTerminal.current_path, check_file=False):
         # ОПАСНО не указывать current_path напрямую, так как питон заполняет это поле,
@@ -1185,6 +1350,7 @@ class PathNavigator:
 
     @staticmethod
     def get_mime_description():
+        """ Хранит в себе описания к mimeType, повторяет все из BiDict"""
         mime_info = [
             {"mime": "application/vnd.google-apps.document", "extension": ".gdoc",
              "description": "Google Docs document"},
@@ -1254,6 +1420,7 @@ class CommandParser:
             'cp': CommandParser.parse_args_cp,
             'rm': CommandParser.parse_args_rm,
             'touch': CommandParser.parse_args_touch,
+            'mv': CommandParser.parse_args_mv,
             'mimeType': CommandParser.parse_args_mimeType,
         }
 
@@ -1426,6 +1593,29 @@ class CommandParser:
             return None
 
     @staticmethod
+    def parse_args_mv(args):
+        parser = argparse.ArgumentParser(description="Move file from source to destination. ")
+        parser.add_argument('source_path', nargs="?", default=None, help=' Where to move the file from. ')
+        parser.add_argument('destination_path', nargs="?", default=None, help='where to move the file. ')
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            print(e)
+            return None
+
+    @staticmethod
     def parse_args_mimeType(args):
         parser = argparse.ArgumentParser(description="Info adout mimeType and extension. ")
 
@@ -1465,7 +1655,7 @@ class UserInterface:
 
 
 if __name__ == '__main__':
-    # touch ~/folder1/file.gsheet
+    # mv ./file ./folder1
 
     terminal = GoogleCloudTerminal()
 
