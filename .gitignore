@@ -1,6 +1,7 @@
 env/
-token.json
-encryption/google_credentials.json
+encryption/token.json
+encryption/credentials.json
+encryption/origin_credentials.json
 gittoken
 encryption/encrypt_credentials.py
 encryption/.env
