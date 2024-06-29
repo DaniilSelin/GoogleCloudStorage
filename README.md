@@ -50,7 +50,7 @@ Google Cloud Drive Terminal - это командный интерфейс дл�
     ENCRYPTION_KEY=<Полученный от меня ключ>
     ```
 
-7. В load_to_cloud классе GoogleCloudTerminal в методе `__init__()`:
+6.2. Если вы создавали свое приложение, в load_to_cloud классе GoogleCloudTerminal в методе `__init__()`:
 
     ```python
     self.credentials_path = <Путь к скачанным credentials>
