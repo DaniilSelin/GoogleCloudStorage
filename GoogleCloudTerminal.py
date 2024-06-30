@@ -155,7 +155,7 @@ class GoogleCloudTerminal:
             new_path = PathNavigator.validate_path(path=args.path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
             if new_path:
-                GoogleCloudTerminal.current_path = new_path
+                os.environ["GOOGLE_CLOUD_CURRENT_PATH"] = new_path
                 return new_path
         except Exception:
             print("Error: New path is incorrect")
