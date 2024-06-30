@@ -35,11 +35,15 @@ class GoogleCloudTerminal:
         self.token_path = os.path.join(os.path.dirname(__file__), token_path)
         self.credentials_path = os.path.join(os.path.dirname(__file__), credentials_path)
 
-        #авто запуск авторизации
+        # авто запуск авторизации
         self._autorization()
-        #получаем идентификатор драйвера пользователя
-        os.environ["GOOGLE_CLOUD_MY_DRIVE_ID"] = FileManager.get_user_drive_id()
-        os.environ["GOOGLE_CLOUD_CURRENT_PATH"] = FileManager.get_user_drive_id()
+        # получаем идентификатор драйвера пользователя
+        user_drive_id = FileManager.get_user_drive_id()
+        if user_drive_id:
+            os.environ["GOOGLE_CLOUD_MY_DRIVE_ID"] = user_drive_id
+            os.environ["GOOGLE_CLOUD_CURRENT_PATH"] = user_drive_id
+        else:
+            raise ValueError("Failed to retrieve user drive ID.")
 
     @property
     def _creds(self):
@@ -148,7 +152,7 @@ class GoogleCloudTerminal:
             path_new (str): Новый путь для перехода.
         """
         try:
-            new_path = PathNavigator.validate_path(path=args.path, current_path=GoogleCloudTerminal.current_path)
+            new_path = PathNavigator.validate_path(path=args.path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
             if new_path:
                 GoogleCloudTerminal.current_path = new_path
