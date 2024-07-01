@@ -1,6 +1,7 @@
 from CommandParser import CommandParser
 from FileManager import FileManager
 from PathNavigator import PathNavigator
+from UserInterface import UserInterface
 
 import os
 import sys
@@ -37,13 +38,22 @@ class GoogleCloudTerminal:
 
         # авто запуск авторизации
         self._autorization()
+
+        UserInterface.show_message([
+                 {'text': "I'm determining the ID of your GoogleDrive... ", 'color': 'bright_yellow'}
+        ])
+        stop_loading = UserInterface.show_loading_message([{"text": "Definition is complete", "color": "green"}])
         # получаем идентификатор драйвера пользователя
         user_drive_id = FileManager.get_user_drive_id()
         if user_drive_id:
             os.environ["GOOGLE_CLOUD_MY_DRIVE_ID"] = user_drive_id
             os.environ["GOOGLE_CLOUD_CURRENT_PATH"] = user_drive_id
+            stop_loading()
         else:
-            raise ValueError("Failed to retrieve user drive ID.")
+            UserInterface.show_error([
+                {'text': 'Failed to retrieve user drive ID. ', 'color': 'red'},
+                {'text': 'Please delete your token.json and reauthorize', 'color': 'yellow', "clear": "\n"}]
+                                     )
 
     @property
     def _creds(self):
@@ -58,34 +68,57 @@ class GoogleCloudTerminal:
             Функция для регистрации Google Drive API v3.
             Если пользователь не дал разрешения моему ПО, то кидает на регистрацю
         """
+        UserInterface.show_message(
+            [{'text': 'Starting authorization process...', 'color': 'bright_yellow'}]
+        )
+        stop_loading = UserInterface.show_loading_message()
+
         # Файл token.json хранит учетные данные пользователя и обновляет его автоматически, через запрос (Request)
         if os.path.exists(self.token_path):
             # статический метод класса, который создает экземпляр учетных данных из файла json
             # сразу сериализуем этот объект и кидаем его в переменную окружения
+            UserInterface.show_message(
+                            [{'text': 'Found existing token file. Loading credentials...', 'color': 'bright_yellow'}]
+            )
             os.environ["GOOGLE_CLOUD_CREDS"] = Credentials.from_authorized_user_file(self.token_path).to_json()
+
         # Если нет действительных учетных данных, авторизуйте пользователя.
         if not self._creds or not self._creds.valid:
             if self._creds and self._creds.expired and self._creds.refresh_token:
                 try:
                     # если creds != None и учетные данные просрочились, просто обновляем их запросом
-                    self._creds.refresh(Request())
+                    UserInterface.show_message(
+                        [{'text': "Refreshing expired credentials...", 'color': 'bright_yellow'}]
+                    )
+                    refresh_creds = self._creds
+                    refresh_creds.refresh(Request())
+                    os.environ["GOOGLE_CLOUD_CREDS"] = refresh_creds.to_json()
                 except RefreshError:
                     # Если не удалось обновить токен, удаляем token.json и повторяем авторизацию
+                    UserInterface.show_error(
+                        [{'text': "Failed to refresh credentials. Reauthorizing...", 'color': 'red'}]
+                    )
                     os.remove(self.token_path)
                     os.environ["GOOGLE_CLOUD_CREDS"] = ""
 
             if not self._creds:
+                UserInterface.show_message(
+                    [{'text': "No valid credentials found. Starting new authorization...", 'color': 'bright_yellow'}]
+                )
                 # Читаем содержимое файла credentials.json
                 with open(self.credentials_path) as f:
                     try:
                         cred_check = json.load(f)
                     except json.JSONDecodeError as e:
-                        print(" Credentials not found, i trying decrypt them. ")
+                        UserInterface.show_error(
+                            "Credentials not found, trying to decrypt them."
+                        )
                         from encryption import decrypt_credentials
 
                         if decrypt_credentials.decrypt("encryption"):
-                            print("Credentials have been created, we continue the authorization process. ")
-
+                            UserInterface.show_success(
+                                "Credentials have been created. Continuing authorization process."
+                            )
                 # создаем поток авторизации, то бишь получаем от имени моего ПО данные для авторизации в диске юзера
                 # собственно данные проекта, приложение, меня как разработчика лежат в credentials
                 # потом сразу пускаем на выбранном ОС порте (порт=0) сервер для прослушивания ответа от потока авторизации
@@ -95,6 +128,14 @@ class GoogleCloudTerminal:
                 # Сохраните учетные данные для следующего запуска.
                 with open(self.token_path, 'w') as token:
                     token.write(os.getenv("GOOGLE_CLOUD_CREDS"))
+                UserInterface.show_success("Authorization successful. Credentials saved. ")
+                stop_loading()
+            elif self._creds.valid:
+                UserInterface.show_success("Authorization successful. ")
+                stop_loading()
+        else:
+            UserInterface.show_success("Authorization successful. ")
+            stop_loading()
 
     def execute_command(self, input_string: str):
         """
@@ -217,23 +258,6 @@ class GoogleCloudTerminal:
 
     def mimeType(self):
         FileManager.mimeType()
-
-
-class UserInterface:
-    def __init__(self):
-        pass
-
-    def show_message(self, message):
-        sys.stdout.write(message + '\n')
-
-    def show_error(self, error_message):
-        sys.stdout.write(error_message + '\n')
-
-    def show_success(self, success_message):
-        sys.stdout.write(success_message + '\n')
-
-    def request_input(self, prompt):
-        return sys.stdin.readlines(prompt)
 
 
 if __name__ == '__main__':
