@@ -32,7 +32,11 @@ class CommandParser:
             'rm': CommandParser.parse_args_rm,
             'touch': CommandParser.parse_args_touch,
             'mv': CommandParser.parse_args_mv,
+            'ren': CommandParser.parse_args_ren,
+            'trash': CommandParser.parse_args_trash,
+            'restore': CommandParser.parse_args_restore,
             'mimeType': CommandParser.parse_args_mimeType,
+            'emptyTrash': CommandParser.parse_args_empty_trash,
         }
 
         parts = shlex.split(input_string)  # Используем shlex для разбора строки
@@ -227,8 +231,96 @@ class CommandParser:
             return None
 
     @staticmethod
+    def parse_args_ren(args):
+        parser = argparse.ArgumentParser(description="Rename files. ")
+        parser.add_argument('perl_expression', nargs="?", default=None, help='Perl-expression for change name files. ')
+        parser.add_argument('pattern_file', nargs="?", default=None, help='Pattern for search files that need to be rename. ')
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
     def parse_args_mimeType(args):
         parser = argparse.ArgumentParser(description="Info adout mimeType and extension. ")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_trash(args):
+        parser = argparse.ArgumentParser(description="Move file to trash. ")
+        parser.add_argument('path', nargs="?", default=None, help='Path file that need move to trash. ')
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_restore(args):
+        parser = argparse.ArgumentParser(description="Restore file from trash. ")
+        parser.add_argument('path', nargs="?", default=None, help='Path file that need restore from trash. Path before moving to trash')
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_empty_trash(args):
+        parser = argparse.ArgumentParser(description="Command for empty trash. ")
 
         try:
             # Проверка на наличие --help или -h

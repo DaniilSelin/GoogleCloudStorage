@@ -1007,7 +1007,6 @@ class FileManager:
 
         response = requests.patch(url, headers=headers, json=body)
 
-        source_metadata = FileManager.get_file_metadata(source_id)
         if response.status_code == 200:
             UserInterface.show_message(f"Transfer is completed, new parents id: {response.json()['id']}")
             return response.json()
@@ -1016,9 +1015,186 @@ class FileManager:
             return None
 
     @staticmethod
+    def ren(perl_expression, pattern_file):
+        """
+        Переименовывает согласно perl-выражению файлы с именнем подходящему по pattern_file.
+        По сути урезаная копия rename Perl-expression из линукса, но со сложныеми perl-выражения не работает,
+            так как это требует компиляции таких perl-выражений, чего уже я не хочу
+        Пример: ren 's/old/new/' old_file.txt
+
+        Args:
+            perl_expression (str): Perl-выражение.
+            pattern_file (str): паттерн согласно, которому избираются файлы.
+        """
+        stop_loading = UserInterface.show_loading_message()
+
+        import fnmatch
+        files = PathNavigator.get_child_files(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
+        # Разделяем Perl-выражение на паттерн и замену
+        try:
+            pattern, replacement = perl_expression.split('/')[1:3]
+        except Exception as e:
+            UserInterface.show_error(f"Incorrect pattern: {e}")
+            stop_loading()
+            return
+
+        # Применяем регулярное выражение
+        for file in files:
+            if fnmatch.fnmatch(file['name'], pattern_file):
+                try:
+                    file_new_name = re.sub(pattern, replacement, file['name'])
+                except Exception as e:
+                    UserInterface.show_error(f"Incorrect pattern: {e}")
+                    continue
+
+                if file_new_name == file['name']:
+                    UserInterface.show_message(
+                        [{"text": "Old and new names the same.", "color": "bright_yellow"}]
+                    )
+                    continue
+                # обновляем имя файла
+                # Метод для обновления временных меток файла в Google Drive
+                headers = {
+                    'Authorization': f'Bearer {FileManager._creds().token}',
+                    'Content-Type': 'application/json'
+                }
+
+                url = f'https://www.googleapis.com/drive/v3/files/{file["id"]}'
+
+                body = {
+                    'name': file_new_name,
+                    'fields': 'name, id'  # Указываем поля, которые хотим получить в ответе
+                }
+
+                response = requests.patch(url, headers=headers, json=body)
+
+                if response.status_code == 200:
+                    UserInterface.show_message(f"rename is completed")
+                else:
+                    UserInterface.show_error(
+                        f'Failed to rename file. Status code: {response.status_code}: {response.text}'
+                    )
+        stop_loading()
+
+    @staticmethod
+    def info():
+        pass
+
+    @staticmethod
     def mimeType():
         """
         Функция для вывода списка mimeType и их расширений.
         """
         for mime in PathNavigator.get_mime_description():
             UserInterface.show_message(f"{mime['mime']} ({mime['extension']}): {mime['description']}")
+
+    @staticmethod
+    def trash(path):
+        """
+        Перемещает файл по пути path в корзину
+
+        Args:
+            path (str): путь к тому что надо переместить в корзину.
+        """
+        stop_loading = UserInterface.show_loading_message()
+
+        file_id = PathNavigator.validate_path(
+            path,
+            os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
+            check_file=True
+        )
+
+        if not file_id:
+            UserInterface.show_error("Incorrect path. ")
+            stop_loading()
+            return
+
+        # URL запроса
+        url = f'https://www.googleapis.com/drive/v3/files/{file_id}'
+
+        # Заголовки
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/json'
+        }
+
+        # Тело запроса
+        body = {
+            'trashed': True
+        }
+
+        # Отправка запроса
+        response = requests.patch(url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            UserInterface.show_success('File moved to trash successfully.')
+        else:
+            UserInterface.show_error(f'Failed to move file to trash: {response.text}')
+        stop_loading()
+
+    @staticmethod
+    def restore(path):
+        """
+        Восстанавливает файл из корзины по пути *path.
+        * - учитывается положение файла до перемещения в корзину.
+
+        Args:
+            path (str): путь к тому что надо восстановить из корзины.
+        """
+        stop_loading = UserInterface.show_loading_message()
+
+        file_id = PathNavigator.validate_path(
+            path,
+            os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
+            check_file=True
+        )
+
+        if not file_id:
+            UserInterface.show_error("Incorrect path. ")
+            stop_loading()
+            return
+
+        # URL запроса
+        url = f'https://www.googleapis.com/drive/v3/files/{file_id}'
+
+        # Заголовки
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/json'
+        }
+
+        # Тело запроса
+        body = {
+            'trashed': False
+        }
+
+        # Отправка запроса
+        response = requests.patch(url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            UserInterface.show_success('File restored from trash successfully. ')
+        else:
+            UserInterface.show_error(f'Failed to restore file from trash: {response.text}')
+        stop_loading()
+
+    @staticmethod
+    def empty_trash():
+        """
+        Очищает корзину
+        """
+        # URL запроса
+        url = 'https://www.googleapis.com/drive/v3/files/trash'
+
+        # Заголовки
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+        }
+
+        # Отправка запроса
+        response = requests.delete(url, headers=headers)
+
+        if response.status_code == 204:
+            print('Trash emptied successfully.')
+        else:
+            print(f'Failed to empty trash: {response.text}')
+

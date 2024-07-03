@@ -147,6 +147,7 @@ class GoogleCloudTerminal:
         Args:
             input_string (str): Строка команды, введенная пользователем.
         """
+
         command, args = CommandParser.parser_command(input_string)
         if command == 'cd':
             return self.change_directory(args)
@@ -165,6 +166,14 @@ class GoogleCloudTerminal:
             return self.move(args)
         elif command == 'mimeType':
             return self.mimeType()
+        elif command == 'ren':
+            return self.rename(args)
+        elif command == "trash":
+            return self.trash(args)
+        elif command == "restore":
+            return self.restore(args)
+        elif command == "emptyTrash":
+            return self.empty_trash()
         else:
             UserInterface.show_error(
                 f"Unknown command {command}"
@@ -278,6 +287,22 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
 
+    def rename(self, args):
+        """
+        Метод для переименования файла, реализована Perl-версия rename.
+        Args:
+            args: Аргументы для команды 'mv'.
+        """
+        try:
+            FileManager.ren(
+                perl_expression=args.perl_expression,
+                pattern_file=args.pattern_file
+            )
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+
     def mimeType(self):
         """
         Метод для перемещения файла
@@ -289,6 +314,41 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
 
+    def trash(self, args):
+        """
+        Функция для перемещения файла в корзину.
+        Args:
+            args: Аргументы для команды 'trash'.
+        """
+        try:
+            FileManager.trash(args.path)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+
+    def restore(self, args):
+        """
+        Функция для восстановления файла из корзины.
+        Args:
+            args: Аргументы для команды 'restore'.
+        """
+        try:
+            FileManager.restore(args.path)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+
+    def empty_trash(self):
+        try:
+            FileManager.empty_trash()
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+
+# ren "" *txt
 
 if __name__ == '__main__':
     # mv ./file ./folder1

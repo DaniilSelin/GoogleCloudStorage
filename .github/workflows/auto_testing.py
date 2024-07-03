@@ -95,6 +95,20 @@ class Testing(unittest.TestCase):
             print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             self.terminal.execute_command(tester)
 
+    def test_ren(self):
+        test_cases_cd = test_cases['ren']
+
+        for tester in test_cases_cd:
+            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            self.terminal.execute_command(tester)
+
+    def test_trash(self):
+        test_cases_cd = test_cases['trash']
+
+        for tester in test_cases_cd:
+            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            self.terminal.execute_command(tester)
+
 
 if __name__ == '__main__':
     print("/////// Testing modul run ///////")

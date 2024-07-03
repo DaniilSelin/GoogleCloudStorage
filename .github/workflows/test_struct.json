@@ -21,6 +21,20 @@
         "touch ~/LoadCloud/file_2 --mimeType=application/vnd.google-apps.drawing",
         "touch ~/LoadCloud/file.pdf -m"
     ],
+    "ren": [
+        "cd ~/LoadCloud/",
+        "ren 's/file/new_file/' file.pdf",
+        "ls -l",
+        "ren 's/.pdf/.doc/' *.pdf",
+        "ls -l"
+    ],
+    "trash": [
+        "touch ~/file123.txt",
+        "trash ~/file123.txt",
+        "restore ~/file123.txt",
+        "trash ~/file123.txt",
+        "emptyTrash"
+    ],
     "mkdir":[
         "mkdir ./LoadCloud/folder2/folder -p",
         "mkdir ./LoadCloud/folder1/folder -p"
