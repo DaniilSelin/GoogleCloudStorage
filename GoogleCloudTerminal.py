@@ -148,9 +148,9 @@ class GoogleCloudTerminal:
             input_string (str): Строка команды, введенная пользователем.
         """
         command, args = CommandParser.parser_command(input_string)
-
         if command == 'cd':
             return self.change_directory(args)
+
         elif command == 'ls':
             return self.list_files(args)
         elif command == 'mkdir':
@@ -166,24 +166,9 @@ class GoogleCloudTerminal:
         elif command == 'mimeType':
             return self.mimeType()
         else:
-            print(f"Unknown command: {command}")
-        """
-        try:
-            command, args = CommandParser.parser_command(input_string)
-
-            if command == 'cd':
-                self.change_directory(args)
-            elif command == 'ls':
-                self.list_files(args)
-            elif command == 'mkdir':
-                self.make_directory(args)
-            elif command == 'cp':
-                self.copy(args)
-            else:
-                print(f"Unknown command: {command}")
-
-        except Exception:
-            print(f"Unknown command")"""
+            UserInterface.show_error(
+                f"Unknown command {command}"
+            )
 
     def change_directory(self, args):
         """
@@ -198,8 +183,14 @@ class GoogleCloudTerminal:
             if new_path:
                 os.environ["GOOGLE_CLOUD_CURRENT_PATH"] = new_path
                 return new_path
-        except Exception:
-            print("Error: New path is incorrect")
+            else:
+                UserInterface.show_error(
+                    f"Error: New path is incorrect"
+                )
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
 
     def list_files(self, args):
         """
@@ -210,8 +201,10 @@ class GoogleCloudTerminal:
         try:
             return FileManager.ls(path=args.path, show_long=args.long)
 
-        except Exception:
-            print("Error: ls called except")
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
 
     def make_directory(self, args):
         """
@@ -221,8 +214,10 @@ class GoogleCloudTerminal:
         """
         try:
             return FileManager.mkdir(path=args.path[0], create_parents=args.parents)
-        except Exception:
-            print("Error: ls called except")
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
 
     def copy(self, args):
         """
@@ -230,7 +225,12 @@ class GoogleCloudTerminal:
         Args:
             args: Аргументы для команды 'cp'.
         """
-        FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
+        try:
+            FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
 
     def remove(self, args):
         """
@@ -238,7 +238,12 @@ class GoogleCloudTerminal:
         Args:
             args: Аргументы для команды 'rm'.
         """
-        FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose, interactive=args.interactive)
+        try:
+            FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose, interactive=args.interactive)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
 
     def touch(self, args):
         """
@@ -246,18 +251,43 @@ class GoogleCloudTerminal:
         Args:
             args: Аргументы для команды 'touch'.
         """
-        FileManager.touch(path=args.path,
-                          mimeType=args.mimeType,
-                          time_modification=args.modification)
+        try:
+            FileManager.touch(path=args.path,
+                            mimeType=args.mimeType,
+                            time_modification=args.modification,
+                            verbose=args.verbose
+                            )
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
 
     def move(self, args):
-        FileManager.mv(
-            source_path=args.source_path,
-            destination_path=args.destination_path
-        )
+        """
+        Метод для перемещения файла
+        Args:
+            args: Аргументы для команды 'mv'.
+        """
+        try:
+            FileManager.mv(
+                source_path=args.source_path,
+                destination_path=args.destination_path
+            )
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
 
     def mimeType(self):
-        FileManager.mimeType()
+        """
+        Метод для перемещения файла
+        """
+        try:
+            FileManager.mimeType()
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
 
 
 if __name__ == '__main__':
@@ -270,6 +300,6 @@ if __name__ == '__main__':
     while True:
         input_string = sys.stdin.readline()
 
-        print(terminal.execute_command(input_string))
+        terminal.execute_command(input_string)
 
         sys.stdout.write(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')

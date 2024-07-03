@@ -4,6 +4,7 @@ import os
 import json
 from google.oauth2.credentials import Credentials
 from PathNavigator import PathNavigator
+from UserInterface import UserInterface
 
 
 class BiDict:
@@ -82,20 +83,28 @@ class BiDict:
     @staticmethod
     def get_by_mimeType(key):
         try:
-            return BiDict.forward.get(key)
+            return BiDict.forward[key]
         except KeyError:
-            print("This mimeType is not extension")
-            print("Extensions mimeType: ")
-            print(PathNavigator.get_mime_description())
+            UserInterface.show_message(
+                [
+                    {"text": "This mimeType is not extension", "color": "red"},
+                    {"text": "Extensions mimeType: ", "color": "bright_yellow", "clear": "\n"}
+                ]
+            )
+            PathNavigator.get_mime_description()
 
     @staticmethod
     def get_by_extension(value):
         try:
             return BiDict.backward.get(value)
         except KeyError:
-            print("This extension is not extension")
-            print("Extensions extension: ")
-            print(PathNavigator.get_mime_description())
+            UserInterface.show_message(
+                [
+                    {"text": "This extension is not extension", "color": "red"},
+                    {"text": "Extensions extension: ", "color": "bright_yellow", "clear": "\n"}
+                ]
+            )
+            PathNavigator.get_mime_description()
 
     def __repr__(self):
         return f'BiDict(mimeType<->Extension)'
@@ -157,7 +166,9 @@ class FileManager:
             return root_drive_id
 
         except requests.exceptions.RequestException as e:
-            print(f"Error while retrieving user drive ID: {e}")
+            UserInterface.show_error(
+                f"Error while retrieving user drive ID: {e}"
+            )
             return None
 
     @staticmethod
@@ -186,7 +197,7 @@ class FileManager:
         # Параметры запроса
         params = {
             "corpora": "user",
-            'fields': 'files(name, id, mimeType, parents)',
+            'fields': 'files(name, id, mimeType, parents, size)',
         }
 
         # Отправляем GET-запрос к API Google Drive
@@ -198,16 +209,16 @@ class FileManager:
 
             if called_directly:
                 if not files:
-                    print('Your google drive is empty')
+                    UserInterface.show_message('Your google drive is empty')
                 else:
-                    print('Files:')
+                    UserInterface.show_message('Files: ')
                     for file in files:
-                        print(f'{file["name"]}:{file["id"]}')
+                        UserInterface.show_message(f'{file["name"]}:{file["id"]}')
 
             return files
 
         except requests.exceptions.RequestException as e:
-            print(f'Failed to retrieve files: {e}')
+            UserInterface.show_error(f'Failed to retrieve files: {e}')
             return None
 
     @staticmethod
@@ -236,7 +247,7 @@ class FileManager:
         if response.status_code == 200:
             return response.json()
         else:
-            # print(f'Failed to get file metadata. Status code: {response.status_code}')
+            UserInterface.show_error(f'Failed to get file metadata. Status code: {response.status_code}')
             return None
 
     @staticmethod
@@ -306,8 +317,13 @@ class FileManager:
             file_name = FileManager.find_file_by_id(files, file_id, mime_type)
             if file_name:
                 return file_name
+            elif file_id == os.getenv("GOOGLE_CLOUD_MY_DRIVE_ID"):
+                # Отмечаем, что дошли до корня
+                return None
             else:
-                print(f'File with ID "{file_id}" not found.')
+                UserInterface.show_error(
+                    f'File with ID "{file_id}" not found.'
+                )
                 return None
 
         if name:
@@ -315,8 +331,19 @@ class FileManager:
             if file_id:
                 return file_id
             else:
-                print(f'File with name "{name}" not found.')
+                UserInterface.show_error(
+                    f'File with name "{name}" not found.'
+                )
                 return None
+
+    @staticmethod
+    def format_size(size):
+        # Преобразование размера файла в удобочитаемый формат
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
+            if size < 1024.0:
+                return f"{size:.2f} {unit}"
+            size /= 1024.0
+        return f"{size:.2f} PB"  # Если размер слишком большой
 
     @staticmethod
     def ls(path, show_long=False):
@@ -327,6 +354,7 @@ class FileManager:
             path (str): Путь к директории для отображения. Если None, используется текущая директория.
             show_long (bool): Если True, используется длинный формат отображения (выводит имя файла, его идентификатор и тип).
         """
+        stop_loading = UserInterface.show_loading_message()
 
         files = FileManager.get_list_of_files(called_directly=False)
 
@@ -336,15 +364,20 @@ class FileManager:
             path_parts_id = os.getenv("GOOGLE_CLOUD_CURRENT_PATH")
 
         if not path_parts_id:
-            print("Path is incorrect. ")
+            UserInterface.show_error("Path is incorrect. ")
+            stop_loading()
             return
 
         for file in files:
             if 'parents' in file.keys() and file['parents'][0] == path_parts_id:
                 if show_long:
-                    print(file['name'], " ", file['id'], " ", file['mimeType'])
+                    if "size" in file:
+                        UserInterface.show_message(f"{file['name']} {file['id']} {file['mimeType']} {FileManager.format_size(int(file['size']))}. ")
+                    else:
+                        UserInterface.show_message(f"{file['name']} {file['id']} {file['mimeType']} N/A. ")
                 else:
-                    print(file['name'])
+                    UserInterface.show_message(file['name'])
+        stop_loading()
 
     @staticmethod
     def mkdir(path, create_parents=False, start_path=None, called_directly=True):
@@ -368,6 +401,8 @@ class FileManager:
                 paths_to_create.pop(0)
 
             return new_paths_id
+        # проигрываем анимацию загрузки
+        stop_loading = UserInterface.show_loading_message()
 
         path_parts = re.sub('\n', "", path)
 
@@ -382,7 +417,7 @@ class FileManager:
             parents_id = PathNavigator.validate_path(path_parts, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
             if not parents_id:
-                print("Path is incorrect")
+                UserInterface.show_error("Path is incorrect")
                 return None
 
         # Создаем заголовок с авторизационным токеном
@@ -404,7 +439,9 @@ class FileManager:
             lst = [child['name'] for child in PathNavigator.get_child_files(parents_id)]
 
         if called_directly:
-            print("Create path: ", path, ", parents path id: ", parents_id)
+            UserInterface.show_message(
+                f"Creating path: {path}, parents path id: {parents_id}"
+            )
 
         body = {
             "name": name_path,
@@ -416,11 +453,13 @@ class FileManager:
 
         if response.status_code == 200:
             if called_directly:
-                print('Create folber compleate')
+                UserInterface.show_success('Create folder complete')
+            stop_loading()
             return response.json()['id']
         else:
             if called_directly:
-                print(f'error when creating folber: {response.status_code} - {response.text}')
+                UserInterface.show_error(f'error when creating folder: {response.status_code} - {response.text}')
+            stop_loading()
             return None
 
     @staticmethod
@@ -434,13 +473,13 @@ class FileManager:
         import datetime
 
         if not path:
-            print("File name is not specified. ")
+            UserInterface.show_error("File name is not specified. ")
             return
 
         file_id = PathNavigator.validate_path(path,current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
 
         if not file_id:
-            print("Paths is incorrect")
+            UserInterface.show_error("Paths is incorrect")
             return
 
         # Метод для обновления временных меток файла в Google Drive
@@ -461,13 +500,14 @@ class FileManager:
         response = requests.patch(url, headers=headers, json=body)
 
         if response.status_code == 200:
+            UserInterface.show_success("Update time complete!")
             return response.json()
         else:
-            print(f'Failed to update file times. Status code: {response.status_code}: {response.text}')
+            UserInterface.show_error(f'Failed to update file times. Status code: {response.status_code}: {response.text}')
             return None
 
     @staticmethod
-    def touch(path, mimeType, time_modification):
+    def touch(path, mimeType, time_modification, verbose=False):
         """
         Создает новую директорию по указанному пути.
 
@@ -475,7 +515,10 @@ class FileManager:
             path (str): Путь к новой директории.
             mimeType (str): тип объекта, используется mimeType Google Cloud
             time_modification (bool): Не создавать новый файл, а лишь обновить время доступа
+            verbose (bool): Нужно ли выводить информацию о созданных файлах.
         """
+        stop_loading = UserInterface.show_loading_message()
+
         # Словарь для выбора функции
         actions = {
             'time_modification': FileManager._m_touch,
@@ -485,6 +528,7 @@ class FileManager:
         for action, func in actions.items():
             if locals()[action]:  # Проверить, если параметр истинный
                 func(path)
+                stop_loading()
                 return
 
         path = re.sub('\n', "", path)
@@ -502,19 +546,22 @@ class FileManager:
             parents_id = PathNavigator.validate_path(path)
 
         if not parents_id:
-            print("Path is incorrect")
+            UserInterface.show_error("Path is incorrect")
+            stop_loading()
             return None
 
         if not name_file:
-            print("Ur forgot give me name new filee")
+            UserInterface.show_error("Ur forgot give me name new filee")
 
         # Проверяем есть ли в destination_id папки с таким же именем
         lst = [child['name'] for child in PathNavigator.get_child_files(parents_id)]
 
         while lst.count(name_file):
-            print(f"Name: {name_file} is occupied. ")
+            UserInterface.show_message(
+                [{"text": f"Name: {name_file} is occupied. ", "color": "bright_yellow"}]
+            )
             name_file = f"Copy of {name_file}"
-            print(f"I'll try to create a file named {name_file}. ")
+            UserInterface.show_message(f"I'll try to create a file named '{name_file}'. ")
             lst = [child['name'] for child in PathNavigator.get_child_files(parents_id)]
 
         # Метод для создания файла в Google Cloud
@@ -536,9 +583,17 @@ class FileManager:
         response = requests.post(url, headers=headers, json=body)
 
         if response.status_code == 200:
+            if verbose:
+                UserInterface.show_success(
+                    f"Creating file complete! file: name <{response.json()['name']}>, id <{response.json()['id']}>"
+                )
+            else:
+                UserInterface.show_success("Creating file complete!")
+            stop_loading()
             return response.json()
         else:
-            print(f'Failed then create file. Status code: {response.status_code}')
+            UserInterface.show_error(f'Failed then create file. Status code: {response.status_code}')
+            stop_loading()
             return None
 
     @staticmethod
@@ -551,14 +606,18 @@ class FileManager:
             destination (str): Путь куда надо скопировать.
             recursive (bool): Нужно ли копировать рекурсивно.
         """
+        stop_loading = UserInterface.show_loading_message()
+
         source_id = PathNavigator.validate_path(source, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
         destination_id = PathNavigator.validate_path(destination, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
         # проверяем корректность обоих путей
         if not source_id:
-            print("Source is incorrect")
-            return None
+            UserInterface.show_error("Source is incorrect")
+            stop_loading()
+            return
         if not destination_id:
-            print("Destination is incorrect")
+            UserInterface.show_error("Destination is incorrect")
+            stop_loading()
             return None
 
         # сначала проверим тип файла, и если он не папка, то независимо от recursive
@@ -567,14 +626,20 @@ class FileManager:
 
         if file_source['mimeType'] == 'application/vnd.google-apps.folder' and not recursive:
             if FileManager._copy_folder(file_source, destination_id):
-                print(f'Folder copied successfully to {destination}')
-        elif file_source['mimeType'] != 'application/vnd.google-apps.folder' and recursive:
+                UserInterface.show_success(f'Folder copied successfully to {destination}')
+                stop_loading()
+                return
+        elif file_source['mimeType'] != 'application/vnd.google-apps.folder':
             # так как у не папки детей быть не может, а лишняя предосторожность не помешает
             if FileManager._copy_file(file_source, destination_id):
-                print(f'File copied successfully to {destination}')
+                UserInterface.show_success(f'File copied successfully to {destination}')
+                stop_loading()
+                return
         else:
             if FileManager._copy_directory(file_source, destination_id):
-                print(f'Recursive files copied successfully to {destination}')
+                UserInterface.show_success(f'Recursive files copied successfully to {destination}')
+                stop_loading()
+                return
 
     @staticmethod
     def _copy_folder(source, destination_id):
@@ -643,7 +708,7 @@ class FileManager:
         if response.status_code == 200:
             return response.json()
         else:
-            print(f"Error copying file: {response.status_code} - {response.text}")
+            UserInterface.show_error(f"Error copying file: {response.status_code} - {response.text}")
             return None
 
     @staticmethod
@@ -682,7 +747,6 @@ class FileManager:
 
             else:
                 FileManager._copy_file(file, destination_id)
-
         return True
 
     @staticmethod
@@ -736,25 +800,27 @@ class FileManager:
             if verbose:
                 try:
                     rfile_mime = BiDict.get_by_mimeType(file_remove['mimeType'])
-                    print(f"I'll trying delete: {file_remove['name']} ({rfile_mime}): {file_remove['id']}")
+                    UserInterface.show_message(f"I'll trying delete: {file_remove['name']} ({rfile_mime}): {file_remove['id']}")
                 except KeyError:
-                    print("mimeType is not defined")
-                    print(f"I'll trying delete: {file_remove['name']} (None): {file_remove['id']}")
+                    UserInterface.show_message(
+                        [{"text": f"mimeType is not defined", "color": "bright_yellow"}]
+                    )
+                    UserInterface.show_message(f"I'll trying delete: {file_remove['name']} (None): {file_remove['id']}")
 
             if interactive:
                 if FileManager._confirm_action(file_remove['name']):
-                    print("The action is confirmed. We continue the execution. ")
+                    UserInterface.show_message("The action is confirmed. We continue the execution. ")
                     response = FileManager._remove_file(file_remove['id'])
                 else:
-                    print("The action has been canceled. ")
+                    UserInterface.show_message("The action has been canceled. ")
                     continue
             else:
                 response = FileManager._remove_file(file_remove['id'])
 
             if response.status_code == 204:
-                print(f"{file_remove['name']} delete complete")
+                UserInterface.show_success(f"{file_remove['name']} delete complete")
             else:
-                print(f'error when deleting file: {response.status_code} - {response.text}')
+                UserInterface.show_error(f'error when deleting file: {response.status_code} - {response.text}')
 
     @staticmethod
     def _confirm_action(name_file):
@@ -765,13 +831,18 @@ class FileManager:
             name_file (str): Имя файла, над которым будет производиться действие.
         """
         while True:
-            response = input(f"Are you sure you want to delete this file: {name_file}? (yes/no): ").strip().lower()
+            UserInterface.show_message(
+                [{"text": f"Are you sure you want to delete this file: ", "color": "bright_yellow"}]
+            )
+            response = input().strip().lower()
             if response in ('yes', 'y'):
                 return True
             elif response in ('no', 'n'):
                 return False
             else:
-                print("Please enter 'yes' or 'no' to confirm.")
+                UserInterface.show_message(
+                    [{"text": f"Please enter 'yes' or 'no' to confirm. ", "color": "bright_yellow"}]
+                )
 
     @staticmethod
     def rm(path, recursive, verbose, interactive):
@@ -784,11 +855,13 @@ class FileManager:
             interactive (bool): Запрашивать согласие перед каждым удалением файла, в случае отказа, файл не будет удлён.
             recursive (bool): Каскадное удаление файлов в path.
         """
-        id_remove = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
-        file_remove_root = FileManager.get_file_metadata(id_remove)
+        stop_loading = UserInterface.show_loading_message()
 
+        id_remove = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
         if not id_remove:
+            stop_loading()
             return None
+        file_remove_root = FileManager.get_file_metadata(id_remove)
 
         # папку без рекурсиваного удаления, удалять нельзя
         if file_remove_root['mimeType'] == 'application/vnd.google-apps.folder':
@@ -799,81 +872,101 @@ class FileManager:
 
                 if interactive:
                     if FileManager._confirm_action(file_remove_root['name']):
-                        print("The action is confirmed. We continue the execution. ")
+                        UserInterface.show_message("The action is confirmed. We continue the execution. ")
                         response = FileManager._remove_file(id_remove)
                     else:
-                        print("The action has been canceled. ")
+                        UserInterface.show_message("The action has been canceled. ")
+                        stop_loading()
                         return
 
                 else:
                     if verbose:
-                        print(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
+                        UserInterface.show_message(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
 
                     response = FileManager._remove_file(id_remove)
 
                 if response.status_code == 204:
-                    print(f"{file_remove_root['name']} delete complete")
+                    UserInterface.show_success(f"{file_remove_root['name']} delete complete")
+                    stop_loading()
+                    return
                 else:
-                    print(f'error when deleting file: {response.status_code} - {response.text}')
+                    UserInterface.show_error(f'error when deleting file: {response.status_code} - {response.text}')
 
             elif recursive:
                 response = None
 
                 if verbose:
-                    print(f"folder ({file_remove_root['name']}) have child files, i'll try to delete them.")
-                    print(f"I'm starting to clean the branch")
+                    UserInterface.show_message([
+                        {"text": f"folder ({file_remove_root['name']}) have child files, i'll try to delete them.", 'color': "bright_yellow"}
+                        ])
+                    UserInterface.show_message(f"I'm starting to clean the branch")
 
                 # чистим ветку
                 FileManager._recursive_remove_branch(verbose, interactive, remove_files_struct)
 
                 if verbose:
-                    print(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
+                    UserInterface.show_message(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
 
                 if interactive:
                     if FileManager._confirm_action(file_remove_root['name']):
-                        print("The action is confirmed. We continue the execution. ")
+                        UserInterface.show_message("The action is confirmed. We continue the execution. ")
                         response = FileManager._remove_file(id_remove)
                     else:
-                        print("The action has been canceled. ")
+                        UserInterface.show_message("The action has been canceled. ")
+                        stop_loading()
                         return
                 else:
                     # удаляем корень очищенной ветки
                     response = FileManager._remove_file(id_remove)
 
                 if response.status_code == 204:
-                    print(f"{file_remove_root['name']} delete complete")
-                    print(f'Recursive deletion is complete')
+                    UserInterface.show_success(f"{file_remove_root['name']} delete complete")
+                    UserInterface.show_success(f'Recursive deletion is complete')
+                    stop_loading()
+                    return
                 else:
-                    print(f'error when deleting file: {response.status_code} - {response.text}')
+                    UserInterface.show_error(f'error when deleting file: {response.status_code} - {response.text}')
+                    stop_loading()
+                    return
             else:
-                print(f'error when deleting file: This folder have child files')
+                UserInterface.show_error(f'error when deleting file: This folder have child files')
+                stop_loading()
+                return
 
         else:
             response = None
 
             if interactive:
                 if FileManager._confirm_action(file_remove_root['name']):
-                    print("The action is confirmed. We continue the execution. ")
+                    UserInterface.show_message("The action is confirmed. We continue the execution. ")
                     response = FileManager._remove_file(id_remove)
                 else:
-                    print("The action has been canceled. ")
+                    UserInterface.show_message("The action has been canceled. ")
+                    stop_loading()
                     return
 
             else:
                 if verbose:
                     try:
                         rfile_mime = BiDict.get_by_mimeType(file_remove_root['mimeType'])
-                        print(f"I'll trying delete: {file_remove_root['name']} ({rfile_mime}): {file_remove_root['id']}")
+                        UserInterface.show_message(f"I'll trying delete: {file_remove_root['name']} ({rfile_mime}): {file_remove_root['id']}")
                     except KeyError:
-                        print("mimeType is not defined")
-                        print(f"I'll trying delete: {file_remove_root['name']} (None): {file_remove_root['id']}")
+                        UserInterface.show_message(
+                            [{"text": f"mimeType is not defined", "color": "bright_yellow"}]
+                        )
+                        UserInterface.show_message(
+                            f"I'll trying delete: {file_remove_root['name']} (None): {file_remove_root['id']}")
 
                 response = FileManager._remove_file(id_remove)
 
             if response.status_code == 204:
-                print(f"{file_remove_root['name']} delete complete")
+                UserInterface.show_success(f"{file_remove_root['name']} delete complete")
+                stop_loading()
+                return
             else:
-                print(f'error when deleting file: {response.status_code} - {response.text}')
+                UserInterface.show_error(f'error when deleting file: {response.status_code} - {response.text}')
+                stop_loading()
+                return
 
     @staticmethod
     def mv(source_path: str, destination_path: str):
@@ -889,15 +982,14 @@ class FileManager:
         destination_id = PathNavigator.validate_path(destination_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
         if not source_id:
-            print("Source path is incorrect")
+            UserInterface.show_error("Source path is incorrect")
             return
 
         if not destination_id:
-            print("Destination path is incorrect")
+            UserInterface.show_error("Destination path is incorrect")
             return
 
         source_metadata = FileManager.get_file_metadata(source_id)
-        print(source_metadata)
 
         # Метод для обновления временных меток файла в Google Drive
         headers = {
@@ -916,12 +1008,11 @@ class FileManager:
         response = requests.patch(url, headers=headers, json=body)
 
         source_metadata = FileManager.get_file_metadata(source_id)
-        print(source_metadata)
         if response.status_code == 200:
-            print(response.json())
+            UserInterface.show_message(f"Transfer is completed, new parents id: {response.json()['id']}")
             return response.json()
         else:
-            print(f'Failed to move file times. Status code: {response.status_code}: {response.text}')
+            UserInterface.show_error(f'Failed to move file times. Status code: {response.status_code}: {response.text}')
             return None
 
     @staticmethod
@@ -930,4 +1021,4 @@ class FileManager:
         Функция для вывода списка mimeType и их расширений.
         """
         for mime in PathNavigator.get_mime_description():
-            print(f"{mime['mime']} ({mime['extension']}): {mime['description']}")
+            UserInterface.show_message(f"{mime['mime']} ({mime['extension']}): {mime['description']}")

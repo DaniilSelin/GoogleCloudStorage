@@ -48,7 +48,7 @@ class UserInterface:
 
     @staticmethod
     def show_loading_message(completion_message=None):
-        animation = "|/-\\/"
+        animation = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
         idx = 0
         # утсанавеваем событие для завершения анимации
         stop_loading = threading.Event()
@@ -56,10 +56,10 @@ class UserInterface:
         def loading():
             nonlocal idx
             while not stop_loading.is_set():
-                sys.stdout.write(f"\rLoading... {animation[idx % len(animation)]}")
+                sys.stdout.write(f"\rLoading {animation[idx % len(animation)]}")
                 sys.stdout.flush()
                 idx += 1
-                time.sleep(0.1)
+                time.sleep(0.16)
             sys.stdout.write("\r" + " " * 20 + "\r")  # Очищаем строку после остановки
             if completion_message:
                 formatted_message = UserInterface.format_message(completion_message) if isinstance(completion_message, list) else completion_message
@@ -88,18 +88,27 @@ class UserInterface:
 
     @staticmethod
     def show_message(message):
-        formatted_message = UserInterface.format_message(message) if isinstance(message, list) else message
+        if isinstance(message, list):
+            formatted_message = UserInterface.format_message(message)
+        else:
+            formatted_message = "\r" + message
         sys.stdout.write(formatted_message + '\n')
 
     @staticmethod
     def show_error(error_message):
-        formatted_message = UserInterface.format_message(error_message) if isinstance(error_message, list) else error_message
+        if isinstance(error_message, list):
+            formatted_message = UserInterface.format_message(error_message)
+        else:
+            formatted_message = "\r" + error_message
         sys.stdout.write("\r" + UserInterface.COLORS['red'] + formatted_message + UserInterface.COLORS['reset'] + '\n')
 
     @staticmethod
     def show_success(success_message):
-        formatted_message = UserInterface.format_message(success_message) if isinstance(success_message, list) else success_message
-        sys.stdout.write("\r" + UserInterface.COLORS['green'] + formatted_message + UserInterface.COLORS['reset'] + '\n')
+        if isinstance(success_message, list):
+            formatted_message = UserInterface.format_message(success_message)
+        else:
+            formatted_message = "\r" + success_message
+        sys.stdout.write(UserInterface.COLORS['green'] + formatted_message + UserInterface.COLORS['reset'] + '\n')
 
     @staticmethod
     def request_input(prompt):

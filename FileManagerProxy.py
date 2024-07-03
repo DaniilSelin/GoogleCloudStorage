@@ -2,6 +2,7 @@ import requests
 import os
 import json
 from google.oauth2.credentials import Credentials
+from UserInterface import UserInterface
 
 
 class FileManagerProxy:
@@ -51,17 +52,13 @@ class FileManagerProxy:
             files = response.json().get('files', [])
 
             if called_directly:
-                if not files:
-                    print('Your google drive is empty')
-                else:
-                    print('Files:')
-                    for file in files:
-                        print(f'{file["name"]}:{file["id"]}')
+                # Класс вобще не долен затрагиваться пользователем
+                pass
 
             return files
 
         except requests.exceptions.RequestException as e:
-            print(f'Failed to retrieve files: {e}')
+            UserInterface.show_error(f'Failed to retrieve files: {e}')
             return None
 
     @staticmethod
@@ -90,7 +87,9 @@ class FileManagerProxy:
         if response.status_code == 200:
             return response.json()
         else:
-            # print(f'Failed to get file metadata. Status code: {response.status_code}')
+            UserInterface.show_error(
+                f'Failed to get file metadata. Status code: {response.status_code}'
+            )
             return None
 
     @staticmethod
@@ -160,8 +159,13 @@ class FileManagerProxy:
             file_name = FileManagerProxy.find_file_by_id(files, file_id, mime_type)
             if file_name:
                 return file_name
+            elif file_id == os.getenv("GOOGLE_CLOUD_MY_DRIVE_ID"):
+                # Отмечаем, что дошли до корня
+                return None
             else:
-                print(f'File with ID "{file_id}" not found.')
+                UserInterface.show_error(
+                    f'File with ID "{file_id}" not found.'
+                )
                 return None
 
         if name:
@@ -169,5 +173,7 @@ class FileManagerProxy:
             if file_id:
                 return file_id
             else:
-                print(f'File with name "{name}" not found.')
+                UserInterface.show_error(
+                    f'File with name "{name}" not found.'
+                )
                 return None

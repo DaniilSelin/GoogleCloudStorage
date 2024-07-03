@@ -1,4 +1,5 @@
 import argparse
+from UserInterface import UserInterface
 
 
 class CommandParser:
@@ -42,10 +43,9 @@ class CommandParser:
         command = parts[0]
         args = parts[1:]
 
-        if command in command:
+        if command in commands:
             return command, commands[command](args)
         else:
-            print(f"Unknown command: {command}")
             return None, None
 
     @staticmethod
@@ -78,8 +78,7 @@ class CommandParser:
             pass
 
         except argparse.ArgumentError as e:
-            # Перехват ArgumentError для обработки ошибок неправильных аргументов
-            print(e)
+            UserInterface.show_error(e)
             return None
 
     @staticmethod
@@ -101,7 +100,7 @@ class CommandParser:
 
         except argparse.ArgumentError as e:
             # Перехват ArgumentError для обработки ошибок неправильных аргументов
-            print(e)
+            UserInterface.show_error(e)
             return None
 
     @staticmethod
@@ -124,7 +123,7 @@ class CommandParser:
 
         except argparse.ArgumentError as e:
             # Перехват ArgumentError для обработки ошибок неправильных аргументов
-            print(e)
+            UserInterface.show_error(e)
             return None
 
     @staticmethod
@@ -148,7 +147,7 @@ class CommandParser:
 
         except argparse.ArgumentError as e:
             # Перехват ArgumentError для обработки ошибок неправильных аргументов
-            print(e)
+            UserInterface.show_error(e)
             return None
 
     @staticmethod
@@ -173,7 +172,7 @@ class CommandParser:
 
         except argparse.ArgumentError as e:
             # Перехват ArgumentError для обработки ошибок неправильных аргументов
-            print(f'Error when parse args command rm: {e}')
+            UserInterface.show_error(e)
             return None
 
     @staticmethod
@@ -182,6 +181,8 @@ class CommandParser:
         parser.add_argument('path', nargs="?", default=None, help='Path file that needs create. ')
         parser.add_argument('-m', '--modification', action='store_true',
                             help="Update the modification time only. Exampl: 2024-06-28T15:30:00Z")
+        parser.add_argument('-v', '--verbose', action='store_true',
+                            help="Print information about the new files? ")
         parser.add_argument('--mimeType', type=str,
                             help="Specify the MIME type for the file being created. Format: --mimeType=<mime-type-string>. If u didn't know mimeType use command: mimeType")
 
@@ -199,7 +200,7 @@ class CommandParser:
 
         except argparse.ArgumentError as e:
             # Перехват ArgumentError для обработки ошибок неправильных аргументов
-            print(f'Error when parse args command touch: {e}')
+            UserInterface.show_error(e)
             return None
 
     @staticmethod
@@ -222,7 +223,7 @@ class CommandParser:
 
         except argparse.ArgumentError as e:
             # Перехват ArgumentError для обработки ошибок неправильных аргументов
-            print(e)
+            UserInterface.show_error(e)
             return None
 
     @staticmethod
@@ -243,5 +244,5 @@ class CommandParser:
 
         except argparse.ArgumentError as e:
             # Перехват ArgumentError для обработки ошибок неправильных аргументов
-            print(f'Error when parse args command mimeType: {e}')
+            UserInterface.show_error(e)
             return None

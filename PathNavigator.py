@@ -1,6 +1,7 @@
 import re
 import os
 from FileManagerProxy import FileManagerProxy
+from UserInterface import UserInterface
 
 
 class PathNavigator:
@@ -46,8 +47,11 @@ class PathNavigator:
             # запрашиваем ид родителя
             post_path_id = post_path["parents"][0]
 
-            if post_path_id == should_parents and len(path_parts) == path_index:
-                return True
+            if len(path_parts) == path_index:
+                if post_path_id == should_parents:
+                    return True
+                else:
+                    return None
 
             name_post_path = FileManagerProxy.look_for_file(file_id=post_path_id)
 
@@ -266,4 +270,9 @@ class PathNavigator:
              "description": "Microsoft PowerPoint presentation"},
             {"mime": "application/zip", "extension": ".zip", "description": "ZIP archive"}
         ]
+
+        for reference in mime_info:
+            UserInterface.show_message(
+                f"{reference['mime']} ({reference['extension']}): {reference['description']}. "
+            )
         return mime_info
