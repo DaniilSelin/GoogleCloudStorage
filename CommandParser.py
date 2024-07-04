@@ -37,6 +37,7 @@ class CommandParser:
             'restore': CommandParser.parse_args_restore,
             'mimeType': CommandParser.parse_args_mimeType,
             'emptyTrash': CommandParser.parse_args_empty_trash,
+            'tree': CommandParser.parse_args_tree,
         }
 
         parts = shlex.split(input_string)  # Используем shlex для разбора строки
@@ -321,6 +322,34 @@ class CommandParser:
     @staticmethod
     def parse_args_empty_trash(args):
         parser = argparse.ArgumentParser(description="Command for empty trash. ")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return None
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_tree(args):
+        parser = argparse.ArgumentParser(description="Display the file structure as a tree. ")
+        parser.add_argument('path', nargs="?", default=None, help='The directory from which to start displaying. ')
+        parser.add_argument('-d', '--dirs_only', action='store_true',
+                            help="List directories only. ")
+        parser.add_argument('-i', '--no_indent', action='store_true',
+                            help="Make tree not print the indentation lines. ")
+        parser.add_argument('-s', '--size', action='store_true',
+                            help="Print the size of each file in bytes. ")
 
         try:
             # Проверка на наличие --help или -h

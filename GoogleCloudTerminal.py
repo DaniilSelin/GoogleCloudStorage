@@ -174,6 +174,8 @@ class GoogleCloudTerminal:
             return self.restore(args)
         elif command == "emptyTrash":
             return self.empty_trash()
+        elif command == "tree":
+            return self.tree(args)
         else:
             UserInterface.show_error(
                 f"Unknown command {command}"
@@ -343,6 +345,19 @@ class GoogleCloudTerminal:
     def empty_trash(self):
         try:
             FileManager.empty_trash()
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+
+    def tree(self, args):
+        """
+        Отображение структуры каталогов в виде дерева.
+        Args:
+            args (str): аргументы для команды tree
+        """
+        try:
+            FileManager.tree(path=args.path, dirs_only=args.dirs_only, no_indent=args.no_indent, size=args.size)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"

@@ -41,7 +41,7 @@ class FileManagerProxy:
         # Параметры запроса
         params = {
             "corpora": "user",
-            'fields': 'files(name, id, mimeType, parents)',
+            'fields': 'files(name, id, mimeType, parents, size)',
         }
 
         # Отправляем GET-запрос к API Google Drive
@@ -79,7 +79,7 @@ class FileManagerProxy:
 
         url = f'https://www.googleapis.com/drive/v3/files/{file_id}'
         params = {
-            'fields': 'name, id, parents, mimeType'
+            'fields': 'name, id, parents, mimeType, size'
         }
 
         response = requests.get(url, headers=headers, params=params)

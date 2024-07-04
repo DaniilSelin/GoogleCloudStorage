@@ -239,7 +239,7 @@ class FileManager:
 
         url = f'https://www.googleapis.com/drive/v3/files/{file_id}'
         params = {
-            'fields': 'name, id, parents, mimeType'
+            'fields': 'name, id, parents, mimeType, size'
         }
 
         response = requests.get(url, headers=headers, params=params)
@@ -389,6 +389,9 @@ class FileManager:
             create_parents (bool): Если True, создаются все необходимые родительские директории.
             called_directly (bool): Вызвана ли функция напрямую пользовтателем
         """
+        # проигрываем анимацию загрузки
+        stop_loading = UserInterface.show_loading_message()
+
         if create_parents:
             gather_needed = PathNavigator.gather_needed_paths(path)
             start_path, paths_to_create = gather_needed.values()
@@ -399,10 +402,8 @@ class FileManager:
 
                 new_paths_id.append(start_path)
                 paths_to_create.pop(0)
-
+            stop_loading()
             return new_paths_id
-        # проигрываем анимацию загрузки
-        stop_loading = UserInterface.show_loading_message()
 
         path_parts = re.sub('\n', "", path)
 
@@ -971,25 +972,42 @@ class FileManager:
     @staticmethod
     def mv(source_path: str, destination_path: str):
         """
-        НЕ РАБОТАЕТ ИЗ ЗА ПРИКОЛОВ GoogleDriveApi, исключение не вызывает.
         Перемещает source_path в destination_path.
 
         Args:
             source_path (str): Путь к тому, что надо переместить.
             destination_path (str): Путь куда ндо переместить.
         """
-        source_id = PathNavigator.validate_path(source_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
-        destination_id = PathNavigator.validate_path(destination_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
+        stop_loading = UserInterface.show_loading_message()
+
+        source_id = PathNavigator.validate_path(source_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
+                                                check_file=True)
+        destination_id = PathNavigator.validate_path(destination_path,
+                                                     current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
         if not source_id:
             UserInterface.show_error("Source path is incorrect")
+            stop_loading()
             return
 
         if not destination_id:
             UserInterface.show_error("Destination path is incorrect")
+            stop_loading()
             return
 
         source_metadata = FileManager.get_file_metadata(source_id)
+
+        if not source_metadata:
+            UserInterface.show_error("Failed to retrieve source file metadata")
+            stop_loading()
+            return
+
+        # Проверка метаданных родителей
+        parents = source_metadata.get("parents")
+        if not parents:
+            UserInterface.show_error("Source file has no parent directory")
+            stop_loading()
+            return
 
         # Метод для обновления временных меток файла в Google Drive
         headers = {
@@ -1000,18 +1018,19 @@ class FileManager:
         url = f'https://www.googleapis.com/drive/v3/files/{source_id}'
 
         body = {
-            'removeParents': source_metadata.get("parents"),
-            'addParents': destination_id,
+            'addParents': [destination_id],
             'fields': 'id, parents'  # Указываем поля, которые хотим получить в ответе
         }
 
         response = requests.patch(url, headers=headers, json=body)
 
         if response.status_code == 200:
-            UserInterface.show_message(f"Transfer is completed, new parents id: {response.json()['id']}")
+            UserInterface.show_success(f"Transfer is completed, new parents id: {response.json()['id']}")
+            stop_loading()
             return response.json()
         else:
             UserInterface.show_error(f'Failed to move file times. Status code: {response.status_code}: {response.text}')
+            stop_loading()
             return None
 
     @staticmethod
@@ -1182,6 +1201,7 @@ class FileManager:
         """
         Очищает корзину
         """
+        stop_loading = UserInterface.show_loading_message()
         # URL запроса
         url = 'https://www.googleapis.com/drive/v3/files/trash'
 
@@ -1194,7 +1214,137 @@ class FileManager:
         response = requests.delete(url, headers=headers)
 
         if response.status_code == 204:
-            print('Trash emptied successfully.')
+            UserInterface.show_success('Trash emptied successfully.')
         else:
-            print(f'Failed to empty trash: {response.text}')
+            UserInterface.show_error(f'Failed to empty trash: {response.text}')
+        stop_loading()
 
+    @staticmethod
+    def tree(path, dirs_only, no_indent, size):
+        """
+        Отображение структуры каталогов в виде дерева.
+        Args:
+            path (str): что возпринимать как окрневой католог (по умолчанию root)
+            dirs_only (bool): Выводим только директории.
+            no_indent (bool): Выводим чистым списком, без ветвления.
+            size (bool): Выводить еще и размер.
+        """
+        stop_loading = UserInterface.show_loading_message()
+
+        source_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+
+        if not source_id:
+            UserInterface.show_error("Path is incorrect")
+            stop_loading()
+            return
+
+        files = PathNavigator.gather_structure(source_id)
+
+        iterator = iter(files)
+
+        count_space = 0
+        indent = "" if no_indent else "    "
+
+        # использую стандартный итератор для фикса проблемы с извлечением следующего элемента при "?"
+        for file in iterator:
+
+            if file == "!":
+                next_file = next(iterator, None)
+                if not next_file:
+                    break
+                elif next_file == "?":
+                    file = "?"
+                else:
+                    file_output = f"{count_space * indent}{next_file['name']}/"
+                    UserInterface.show_message(file_output)
+                    if not no_indent:
+                        count_space += 1
+                    else:
+                        # улиняем путь так как поднялись на одну папку вверх
+                        count_space = 1
+                        if next_file["mimeType"] == 'application/vnd.google-apps.folder':
+                            indent = indent + next_file['name'] + "/"
+                    continue
+
+            elif file == "?":
+                if not no_indent:
+                    count_space -= 1
+                else:
+                    count_space = 1
+                    # урезаем путь так как опустились на одну папку вверх
+                    indent = indent[:-1]
+                    i = len(indent) - 1
+                    while i >= 0 and indent[i] != "/":
+                        indent = indent[:-1]
+                        i -= 1
+                    if len(indent):
+                        indent += ""
+                    else:
+                        indent = indent[:-1]
+
+            else:
+                if no_indent:
+                    count_space = 1
+
+                if dirs_only:
+                    continue
+
+                if size:
+                    if "size" in file:
+                        UserInterface.show_message(
+                            [{"text": f"{count_space * indent}{file['name']} {FileManager.format_size(int(file['size']))}"}]
+                        )
+                    else:
+                        UserInterface.show_message(
+                            [{"text": f"{count_space * indent}{file['name']} N/A"}]
+                        )
+                else:
+                    UserInterface.show_message(
+                        [{"text": f"{count_space * indent}{file['name']} "}]
+                    )
+        stop_loading()
+
+    @staticmethod
+    def du(disk_usage):
+        """
+        Показ размера файлов и директорий
+        Args:
+            disk_usage (str): ?????
+        """
+        pass
+
+    @staticmethod
+    def share():
+        """
+        Управление доступом и настройками общего доступа к файлам и папкам.
+        Синтаксис: share <path> <email> <role> (например, viewer, commenter, editor)
+        """
+        pass
+
+    @staticmethod
+    def quota():
+        """
+         quota: Получение информации о квоте дискового пространства Google Drive.
+        Синтаксис: quota
+        """
+
+    @staticmethod
+    def sync():
+        """
+        sync: Синхронизация локальной директории с Google Drive.
+        Синтаксис: sync <local_path> <drive_path>
+        """
+
+    @staticmethod
+    def upload():
+        """
+           upload: Загрузка файла с локального компьютера в Google Drive.
+        Синтаксис: upload <local_path> <drive_path>
+        """
+
+    @staticmethod
+    def download():
+        """
+         download: Загрузка файла из Google Drive на локальный компьютер.
+        Синтаксис: download <drive_path> <local_path>
+        """

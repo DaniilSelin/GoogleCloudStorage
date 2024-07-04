@@ -23,6 +23,8 @@
     ],
     "ren": [
         "cd ~/LoadCloud/",
+        "tree ~/ -i -s",
+        "touch file.pdf",
         "ren 's/file/new_file/' file.pdf",
         "ls -l",
         "ren 's/.pdf/.doc/' *.pdf",
