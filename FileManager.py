@@ -81,30 +81,36 @@ class BiDict:
         BiDict.backward[value] = key
 
     @staticmethod
-    def get_by_mimeType(key):
+    def get_by_mimeType(key, called_directly=True):
         try:
             return BiDict.forward[key]
         except KeyError:
-            UserInterface.show_message(
-                [
-                    {"text": "This mimeType is not extension", "color": "red"},
-                    {"text": "Extensions mimeType: ", "color": "bright_yellow", "clear": "\n"}
-                ]
-            )
-            PathNavigator.get_mime_description()
+            if called_directly:
+                UserInterface.show_message(
+                    [
+                        {"text": "This mimeType is not extension", "color": "red"},
+                        {"text": "Extensions mimeType: ", "color": "bright_yellow", "clear": "\n"}
+                    ]
+                )
+                PathNavigator.get_mime_description()
+            else:
+                return None
 
     @staticmethod
-    def get_by_extension(value):
+    def get_by_extension(value, called_directly=True):
         try:
             return BiDict.backward.get(value)
         except KeyError:
-            UserInterface.show_message(
-                [
-                    {"text": "This extension is not extension", "color": "red"},
-                    {"text": "Extensions extension: ", "color": "bright_yellow", "clear": "\n"}
-                ]
-            )
-            PathNavigator.get_mime_description()
+            if called_directly:
+                UserInterface.show_message(
+                    [
+                        {"text": "This extension is not extension", "color": "red"},
+                        {"text": "Extensions extension: ", "color": "bright_yellow", "clear": "\n"}
+                    ]
+                )
+                PathNavigator.get_mime_description()
+            else:
+                return None
 
     def __repr__(self):
         return f'BiDict(mimeType<->Extension)'
@@ -346,15 +352,20 @@ class FileManager:
         return f"{size:.2f} PB"  # Если размер слишком большой
 
     @staticmethod
-    def ls(path, show_long=False):
+    def ls(path, pattern, show_long=False):
         """
         Отображает список файлов в указанной директории.
 
         Args:
             path (str): Путь к директории для отображения. Если None, используется текущая директория.
             show_long (bool): Если True, используется длинный формат отображения (выводит имя файла, его идентификатор и тип).
+            pattern (str): Фильтр для вывода необходимых фалой по названию.
+                            Испльзуется Unix-стиль для проверки на соответствия шаблону.
         """
         stop_loading = UserInterface.show_loading_message()
+
+        if pattern:
+            import fnmatch
 
         files = FileManager.get_list_of_files(called_directly=False)
 
@@ -372,11 +383,31 @@ class FileManager:
             if 'parents' in file.keys() and file['parents'][0] == path_parts_id:
                 if show_long:
                     if "size" in file:
-                        UserInterface.show_message(f"{file['name']} {file['id']} {file['mimeType']} {FileManager.format_size(int(file['size']))}. ")
+                        if pattern:
+                            if fnmatch.fnmatch(file['name'], pattern):
+                                UserInterface.show_message(
+                                    f"{file['name']} ({BiDict.get_by_mimeType(file['mimeType'], called_directly=False)}): id:{file['id']} | mimeType:{file['mimeType']} | size:{FileManager.format_size(int(file['size']))}. "
+                                )
+                        else:
+                            UserInterface.show_message(
+                                f"{file['name']} ({BiDict.get_by_mimeType(file['mimeType'], called_directly=False)}): id:{file['id']} | mimeType:{file['mimeType']} | size:{FileManager.format_size(int(file['size']))}. "
+                            )
                     else:
-                        UserInterface.show_message(f"{file['name']} {file['id']} {file['mimeType']} N/A. ")
+                        if pattern:
+                            if fnmatch.fnmatch(file['name'], pattern):
+                                UserInterface.show_message(
+                                    f"{file['name']} ({BiDict.get_by_mimeType(file['mimeType'], called_directly=False)}): id:{file['id']} | mimeType:{file['mimeType']} | size:N/A. "
+                                )
+                        else:
+                            UserInterface.show_message(
+                                f"{file['name']} ({BiDict.get_by_mimeType(file['mimeType'], called_directly=False)}): id:{file['id']} | mimeType:{file['mimeType']} | size:N/A. "
+                            )
                 else:
-                    UserInterface.show_message(file['name'])
+                    if pattern:
+                        if fnmatch.fnmatch(file['name'], pattern):
+                            UserInterface.show_message(file['name'])
+                    else:
+                        UserInterface.show_message(file['name'])
         stop_loading()
 
     @staticmethod
@@ -742,11 +773,11 @@ class FileManager:
                     destination_id = next_file['id']
                     continue
 
-            elif file == "?":
+            if file == "?":
                 previous_file = FileManager.get_file_metadata(destination_id)
                 destination_id = previous_file['parents'][0]
 
-            else:
+            if file != '!' and file != '?':
                 FileManager._copy_file(file, destination_id)
         return True
 
@@ -1096,10 +1127,6 @@ class FileManager:
         stop_loading()
 
     @staticmethod
-    def info():
-        pass
-
-    @staticmethod
     def mimeType():
         """
         Функция для вывода списка mimeType и их расширений.
@@ -1220,7 +1247,7 @@ class FileManager:
         stop_loading()
 
     @staticmethod
-    def tree(path, dirs_only, no_indent, size):
+    def tree(path, dirs_only, no_indent, size, pattern):
         """
         Отображение структуры каталогов в виде дерева.
         Args:
@@ -1228,10 +1255,17 @@ class FileManager:
             dirs_only (bool): Выводим только директории.
             no_indent (bool): Выводим чистым списком, без ветвления.
             size (bool): Выводить еще и размер.
+            pattern (str): Фильтр для вывода необходимых фалой по названию.
+                            Испльзуется Unix-стиль для проверки на соответствия шаблону.
         """
+        if pattern:
+            import fnmatch
         stop_loading = UserInterface.show_loading_message()
 
-        source_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        if path:
+            source_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        else:
+            source_id = os.getenv("GOOGLE_CLOUD_CURRENT_PATH")
 
         if not source_id:
             UserInterface.show_error("Path is incorrect")
@@ -1256,7 +1290,12 @@ class FileManager:
                     file = "?"
                 else:
                     file_output = f"{count_space * indent}{next_file['name']}/"
-                    UserInterface.show_message(file_output)
+                    if not pattern:
+                        UserInterface.show_message(file_output)
+                    else:
+                        if fnmatch.fnmatch(next_file['name'], pattern):
+                            UserInterface.show_message(file_output)
+
                     if not no_indent:
                         count_space += 1
                     else:
@@ -1266,7 +1305,7 @@ class FileManager:
                             indent = indent + next_file['name'] + "/"
                     continue
 
-            elif file == "?":
+            if file == "?":
                 if not no_indent:
                     count_space -= 1
                 else:
@@ -1277,12 +1316,8 @@ class FileManager:
                     while i >= 0 and indent[i] != "/":
                         indent = indent[:-1]
                         i -= 1
-                    if len(indent):
-                        indent += ""
-                    else:
-                        indent = indent[:-1]
 
-            else:
+            if file != '!' and file != '?':
                 if no_indent:
                     count_space = 1
 
@@ -1291,42 +1326,236 @@ class FileManager:
 
                 if size:
                     if "size" in file:
+                        if not pattern:
+                            UserInterface.show_message(
+                                [{"text": f"{count_space * indent}{file['name']} {FileManager.format_size(int(file['size']))}"}]
+                            )
+                        else:
+                            if fnmatch.fnmatch(file['name'], pattern):
+                                UserInterface.show_message(
+                                    [{
+                                         "text": f"{count_space * indent}{file['name']} {FileManager.format_size(int(file['size']))}"}]
+                                )
+                    else:
+                        if not pattern:
+                            UserInterface.show_message(
+                                [{
+                                     "text": f"{count_space * indent}{file['name']} N/A"}]
+                            )
+                        else:
+                            if fnmatch.fnmatch(file['name'], pattern):
+                                UserInterface.show_message(
+                                    [{
+                                        "text": f"{count_space * indent}{file['name']} N/A"}]
+                                )
+                else:
+                    if not pattern:
                         UserInterface.show_message(
-                            [{"text": f"{count_space * indent}{file['name']} {FileManager.format_size(int(file['size']))}"}]
+                            [{"text": f"{count_space * indent}{file['name']} "}]
                         )
                     else:
-                        UserInterface.show_message(
-                            [{"text": f"{count_space * indent}{file['name']} N/A"}]
-                        )
-                else:
-                    UserInterface.show_message(
-                        [{"text": f"{count_space * indent}{file['name']} "}]
-                    )
+                        if fnmatch.fnmatch(file['name'], pattern):
+                            UserInterface.show_message(
+                                [{"text": f"{count_space * indent}{file['name']} "}]
+                            )
         stop_loading()
 
     @staticmethod
-    def du(disk_usage):
+    def du(path, all, show_free_space):
         """
-        Показ размера файлов и директорий
+        Отображение использования дискового пространства на Google Диске.
+
         Args:
-            disk_usage (str): ?????
+            path (str): Путь к директории для анализа.
+            dirs_only (bool): Показывать только директории.
+            show_free_space (bool): Показать свободное место на Google Диске.
         """
-        pass
+        stop_loading = UserInterface.show_loading_message()
+
+        if show_free_space:
+            FileManager.show_free_space()
+            stop_loading()
+            return
+
+        if path:
+            source_id = PathNavigator.validate_path(path=path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
+        else:
+            path = './'
+            source_id = os.getenv("GOOGLE_CLOUD_CURRENT_PATH")
+
+        if not source_id:
+            UserInterface.show_error("Path is incorrect")
+            stop_loading()
+            return
+
+        files = PathNavigator.gather_structure(source_id)
+        FileManager.display_usage(path, files, all)
+
+        stop_loading()
 
     @staticmethod
-    def share():
+    def display_usage(path, files, all):
+        """
+        Отображение использования дискового пространства для списка файлов/директорий.
+        """
+        iterator = iter(files)
+
+        indent = ""
+        total_size = [0]
+        total_folders = ["main"]
+
+        # использую стандартный итератор для фикса проблемы с извлечением следующего элемента при "?"
+        for file in iterator:
+
+            if file == "!":
+                next_file = next(iterator, None)
+                if not next_file:
+                    break
+                elif next_file == "?":
+                    file = "?"
+                else:
+                    total_size.append(0)
+                    total_folders.append(next_file)
+
+                    if next_file["mimeType"] == 'application/vnd.google-apps.folder':
+                        indent = indent + next_file['name'] + "/"
+                    continue
+
+            if file == "?":
+                # урезаем путь так как опустились на одну папку вверх
+                indent = indent[:-1]
+                i = len(indent) - 1
+                while i >= 0 and indent[i] != "/":
+                    indent = indent[:-1]
+                    i -= 1
+                # Выводим размер текущей папки
+                size = total_size.pop()
+                # так как эта папка тоже поддиректория предыдущей
+                total_size[-1] += size
+
+                folder = total_folders.pop()
+
+                result_size = FileManager.format_size(size)
+
+                file_output = f"{result_size}{(10-len(result_size)) * ' '}|    {path}{indent}{folder['name']}/"
+                UserInterface.show_message(file_output)
+
+            if file != '!' and file != '?':
+                if "size" in file:
+                    total_size[-1] += int(file['size'])
+                    if all:
+                        result_size = FileManager.format_size(int(file['size']))
+                        UserInterface.show_message([{
+                            "text": f"{result_size}{(10-len(result_size)) * ' '}|    {path}{indent}{file['name']}"
+                        }])
+                else:
+                     if all:
+                         result_size = "N/A"
+                         UserInterface.show_message([{
+                                "text": f"{result_size}{(10-len(result_size)) * ' '}|    {path}{indent}{file['name']}"
+                         }])
+        # выводим размер основной ветки
+        size = total_size.pop()
+        result_size = FileManager.format_size(size)
+        file_output = f"{result_size}{(10-len(result_size)) * ' '}|    {path}"
+        UserInterface.show_message(file_output)
+
+    @staticmethod
+    def show_free_space():
+        """
+        Показать свободное место на Google Диске.
+        """
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}'
+        }
+
+        url = 'https://www.googleapis.com/drive/v3/about?fields=storageQuota'
+
+        response = requests.get(url, headers=headers)
+
+        if response.status_code == 200:
+            quota = response.json()['storageQuota']
+            limit = int(quota.get('limit', 0))
+            usage = int(quota.get('usage', 0))
+            free_space = limit - usage if limit else 'Unlimited'
+
+            UserInterface.show_message(
+                [{"text": f"Total space: {FileManager.format_size(limit)}", "color": "bright_yellow"}]
+            )
+            UserInterface.show_message(
+                [{"text": f"Used space: {FileManager.format_size(usage)}", "color": "bright_yellow"}]
+            )
+            UserInterface.show_message(
+                [{"text": f"Free space: {FileManager.format_size(free_space)}", "color": "bright_yellow"}]
+            )
+        else:
+            UserInterface.show_error(
+                f'Failed to retrieve free space. Status code: {response.status_code}'
+            )
+
+    @staticmethod
+    def share(path, email, role, type):
         """
         Управление доступом и настройками общего доступа к файлам и папкам.
-        Синтаксис: share <path> <email> <role> (например, viewer, commenter, editor)
+
+        Args:
+            path (str): Путь к файлу или папке, для которых нужно настроить доступ.
+            email (str): Электронная почта пользователя, которому предоставляется доступ.
+            role (str): Роль доступа ('writer', 'commenter', 'reader', 'organizer', 'fileOrganizer').
+            type (str, optional): Тип доступа (по умолчанию 'user'). Может быть 'user', 'group', 'domain', 'anyone', или 'restricted'.
         """
-        pass
+        stop_loading = UserInterface.show_loading_message()
+
+        source_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        if not source_id:
+            UserInterface.show_error("Path is incorrect")
+            stop_loading()
+            return
+
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/json'
+        }
+
+        url = f"https://www.googleapis.com/drive/v3/files/{source_id}/permissions"
+
+        if type == 'restricted':
+            # Удалить все текущие разрешения (ограничить доступ)
+            current_permissions = requests.get(url, headers=headers).json().get('permissions', [])
+            for permission in current_permissions:
+                delete_url = f"{url}/{permission['id']}"
+                requests.delete(delete_url, headers=headers)
+            UserInterface.show_success("All permissions have been removed. The file is now restricted.")
+            stop_loading()
+            return
+
+        body = {
+            'role':  role,
+            'type': type,
+        }
+        if email:
+            body['emailAddress'] = email
+
+        response = requests.post(url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            UserInterface.show_success("Permission granted successfully")
+            stop_loading()
+            return response.json()
+        else:
+            UserInterface.show_error(
+                f'Failed to grant permission. Status code: {response.status_code}: {response.text}')
+            stop_loading()
+            return None
 
     @staticmethod
     def quota():
         """
-         quota: Получение информации о квоте дискового пространства Google Drive.
-        Синтаксис: quota
+        Получение информации о квоте дискового пространства Google Drive.
         """
+        stop_loading = UserInterface.show_loading_message()
+        FileManager.show_free_space()
+        stop_loading()
 
     @staticmethod
     def sync():
@@ -1343,8 +1572,224 @@ class FileManager:
         """
 
     @staticmethod
-    def download():
+    def _confirm_export(mimeType):
         """
-         download: Загрузка файла из Google Drive на локальный компьютер.
-        Синтаксис: download <drive_path> <local_path>
+        Запрашивает подтверждение действия у пользователя.
+
+        Args:
+            name_file (str): Имя файла, над которым будет производиться действие.
         """
+        while True:
+            UserInterface.show_message(
+                [{"text": f"before downloading this file, you need to convert it, select the type to convert: {mimeType}",
+                  "color": "bright_yellow"}]
+            )
+            UserInterface.show_message(
+                [{
+                     "text": f"If you don't want to send file now enter no. ",
+                     "color": "bright_yellow"}]
+            )
+            UserInterface.show_message(
+                [{
+                     "text": f"Your choice: ",
+                     "color": "bright_yellow"}]
+            )
+            response = input().strip().lower()
+            if response in mimeType:
+                return response
+            elif response in ('no', 'n'):
+                return None
+            else:
+                UserInterface.show_message(
+                    [{"text": f"Please enter correct mimeTypes or 'no' to confirm. ", "color": "bright_yellow"}]
+                )
+
+    @staticmethod
+    def export(path, local_path="./", mimeType=None):
+        """
+        Экспорт файла из Google Drive в указанный формат и загрузка на локальный компьютер.
+        Синтаксис: export <drive_path> <mimeType> <local_path>
+
+        Args:
+            path (str): Путь к файлу в Google Drive.
+            mimeType (str): MIME-тип, в который нужно экспортировать файл.
+            local_path (str): Путь на локальном компьютере для сохранения экспортированного файла.
+        """
+
+        file_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        file_metadata = FileManager.get_file_metadata(file_id)
+        source_mimeType = file_metadata['mimeType']
+
+        # MIME-типы, которые можно скачать напрямую
+        downloadable_mime_types = [
+            'application/vnd.google-apps.document',  # Google Docs
+            'application/vnd.google-apps.spreadsheet',  # Google Sheets
+            'application/vnd.google-apps.presentation',  # Google Slides
+            'application/vnd.google-apps.drawing',  # Google Drawings
+            'application/vnd.google-apps.form',  # Google Forms
+            'application/vnd.google-apps.script',  # Google Apps Scripts
+            'application/vnd.google-apps.map',  # Google My Maps
+            'application/vnd.google-apps.site',  # Google Sites
+            'application/vnd.google-apps.folder',  # Google Drive folder
+            'application/vnd.google-apps.file',  # Google Drive file
+            'application/zip',  # Zip file
+            'application/pdf',  # PDF file
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # Microsoft Word (docx)
+            'application/msword',  # Microsoft Word (doc)
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # Microsoft Excel (xlsx)
+            'application/vnd.ms-excel',  # Microsoft Excel (xls)
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',  # Microsoft PowerPoint (pptx)
+            'application/vnd.ms-powerpoint',  # Microsoft PowerPoint (ppt)
+            'image/jpeg',  # JPEG image
+            'image/png',  # PNG image
+            'image/gif',  # GIF image
+            'image/tiff',  # TIFF image
+            'image/bmp',  # BMP image
+            'text/plain',  # Plain text file
+            'text/csv',  # CSV file
+            'text/html',  # HTML file
+            'text/xml',  # XML file
+            'application/json',  # JSON file
+            'video/mp4',  # MP4 video file
+            'video/x-msvideo',  # AVI video file
+            'video/quicktime',  # QuickTime video file
+            'audio/mpeg',  # MP3 audio file
+            'audio/wav',  # WAV audio file
+            'audio/x-aiff',  # AIFF audio file
+        ]
+
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/json'
+        }
+
+        if source_mimeType in downloadable_mime_types:
+            url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
+            response = requests.get(url, headers=headers, stream=True)
+
+            if response.status_code == 200:
+                local_path = os.path.join(os.getcwd(), os.path.basename(path))
+                with open(local_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                UserInterface.show_success(f"File downloaded successfully to {local_path}.")
+            else:
+                UserInterface.show_error(
+                    f"Failed to download file. Status code: {response.status_code}: {response.text}")
+            return
+
+        if mimeType is None:
+            mimeType = FileManager.export_formats(path=path, called_directly=False)
+
+        if mimeType is None:
+            UserInterface.show_error("No export formats available for this file type.")
+            return
+
+        url = f'https://www.googleapis.com/drive/v3/files/{file_id}/export'
+        params = {'mimeType': mimeType}
+
+        response = requests.get(url, headers=headers, params=params, stream=True)
+
+        if response.status_code == 200:
+            local_path = os.path.join(os.getcwd(), os.path.basename(path))
+            with open(local_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            UserInterface.show_success(f"File exported and downloaded successfully to {local_path}.")
+        else:
+            UserInterface.show_error(f"Failed to export file. Status code: {response.status_code}: {response.text}")
+
+    @staticmethod
+    def export_formats(path=None, mimeType=None, called_directly=True):
+        """
+        Получает список поддерживаемых форматов экспорта для заданного MIME-типа файла в Google Drive.
+        Можно указать либо MIME-тип, либо напрямую указать файл, который надо экспортировать.
+
+        Аргументы:
+            mimeType (str): MIME-тип файла, для которого требуется получить список поддерживаемых форматов экспорта.
+            path (str): Путь к файлу в Google Drive. Если указан, будет использован MIME-тип этого файла.
+            called_directly (bool): Флаг, указывающий, был ли метод вызван напрямую пользователем.
+        """
+
+        # MIME-типы, которые можно скачать напрямую
+        downloadable_mime_types = [
+            'application/vnd.google-apps.document',  # Google Docs
+            'application/vnd.google-apps.spreadsheet',  # Google Sheets
+            'application/vnd.google-apps.presentation',  # Google Slides
+            'application/vnd.google-apps.drawing',  # Google Drawings
+            'application/vnd.google-apps.form',  # Google Forms
+            'application/vnd.google-apps.script',  # Google Apps Scripts
+            'application/vnd.google-apps.map',  # Google My Maps
+            'application/vnd.google-apps.site',  # Google Sites
+            'application/vnd.google-apps.folder',  # Google Drive folder
+            'application/vnd.google-apps.file',  # Google Drive file
+            'application/zip',  # Zip file
+            'application/pdf',  # PDF file
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # Microsoft Word (docx)
+            'application/msword',  # Microsoft Word (doc)
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # Microsoft Excel (xlsx)
+            'application/vnd.ms-excel',  # Microsoft Excel (xls)
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',  # Microsoft PowerPoint (pptx)
+            'application/vnd.ms-powerpoint',  # Microsoft PowerPoint (ppt)
+            'image/jpeg',  # JPEG image
+            'image/png',  # PNG image
+            'image/gif',  # GIF image
+            'image/tiff',  # TIFF image
+            'image/bmp',  # BMP image
+            'text/plain',  # Plain text file
+            'text/csv',  # CSV file
+            'text/html',  # HTML file
+            'text/xml',  # XML file
+            'application/json',  # JSON file
+            'video/mp4',  # MP4 video file
+            'video/x-msvideo',  # AVI video file
+            'video/quicktime',  # QuickTime video file
+            'audio/mpeg',  # MP3 audio file
+            'audio/wav',  # WAV audio file
+            'audio/x-aiff',  # AIFF audio file
+        ]
+
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/json'
+        }
+
+        # Если указан путь, получаем MIME-тип файла
+        if path:
+            file_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+            file = FileManager.get_file_metadata(file_id)
+            mimeType = file['mimeType']
+
+        url = 'https://www.googleapis.com/drive/v3/about'
+        params = {'fields': 'exportFormats'}
+
+        response = requests.get(url, headers=headers, params=params)
+
+        if response.status_code != 200:
+            UserInterface.show_error(
+                f"Failed to retrieve export formats. Status code: {response.status_code}: {response.text}")
+            return
+
+        export_formats = response.json().get('exportFormats', {})
+
+        if mimeType in downloadable_mime_types:
+            if called_directly:
+                UserInterface.show_success("This format does not require conversion to download.")
+            return mimeType
+
+        if mimeType not in export_formats:
+            if called_directly:
+                UserInterface.show_error("This format is not available for download.")
+            return None
+
+        if called_directly:
+            for export_type in export_formats[mimeType]:
+                UserInterface.show_message(export_type)
+        else:
+            return export_formats[mimeType]
+
+    @staticmethod
+    def info():
+        pass

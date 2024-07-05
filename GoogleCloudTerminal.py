@@ -165,7 +165,7 @@ class GoogleCloudTerminal:
         elif command == 'mv':
             return self.move(args)
         elif command == 'mimeType':
-            return self.mimeType()
+            return self.mimeType(args)
         elif command == 'ren':
             return self.rename(args)
         elif command == "trash":
@@ -173,9 +173,19 @@ class GoogleCloudTerminal:
         elif command == "restore":
             return self.restore(args)
         elif command == "emptyTrash":
-            return self.empty_trash()
+            return self.empty_trash(args)
         elif command == "tree":
             return self.tree(args)
+        elif command == "du":
+            return self.disk_usage(args)
+        elif command == "share":
+            return self.share(args)
+        elif command == "quota":
+            return self.quota(args)
+        elif command == "export":
+            return self.export(args)
+        elif command == "export_format":
+            return self.export_format(args)
         else:
             UserInterface.show_error(
                 f"Unknown command {command}"
@@ -189,6 +199,9 @@ class GoogleCloudTerminal:
             path_new (str): Новый путь для перехода.
         """
         try:
+            if args == 'help':
+                return
+
             new_path = PathNavigator.validate_path(path=args.path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
             if new_path:
@@ -210,7 +223,10 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'ls'.
         """
         try:
-            return FileManager.ls(path=args.path, show_long=args.long)
+            if args == 'help':
+                return
+
+            return FileManager.ls(path=args.path, show_long=args.long, pattern=args.pattern)
 
         except Exception as e:
             UserInterface.show_error(
@@ -224,6 +240,9 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'mkdir'.
         """
         try:
+            if args == 'help':
+                return
+
             return FileManager.mkdir(path=args.path[0], create_parents=args.parents)
         except Exception as e:
             UserInterface.show_error(
@@ -237,6 +256,9 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'cp'.
         """
         try:
+            if args == 'help':
+                return
+
             FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
         except Exception as e:
             UserInterface.show_error(
@@ -250,6 +272,9 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'rm'.
         """
         try:
+            if args == 'help':
+                return
+
             FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose, interactive=args.interactive)
         except Exception as e:
             UserInterface.show_error(
@@ -263,6 +288,9 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'touch'.
         """
         try:
+            if args == 'help':
+                return
+
             FileManager.touch(path=args.path,
                             mimeType=args.mimeType,
                             time_modification=args.modification,
@@ -280,6 +308,9 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'mv'.
         """
         try:
+            if args == 'help':
+                return
+
             FileManager.mv(
                 source_path=args.source_path,
                 destination_path=args.destination_path
@@ -296,6 +327,9 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'mv'.
         """
         try:
+            if args == 'help':
+                return
+
             FileManager.ren(
                 perl_expression=args.perl_expression,
                 pattern_file=args.pattern_file
@@ -305,11 +339,14 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
 
-    def mimeType(self):
+    def mimeType(self, args):
         """
         Метод для перемещения файла
         """
         try:
+            if args == 'help':
+                return
+
             FileManager.mimeType()
         except Exception as e:
             UserInterface.show_error(
@@ -323,6 +360,9 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'trash'.
         """
         try:
+            if args == 'help':
+                return
+
             FileManager.trash(args.path)
         except Exception as e:
             UserInterface.show_error(
@@ -336,14 +376,20 @@ class GoogleCloudTerminal:
             args: Аргументы для команды 'restore'.
         """
         try:
+            if args == 'help':
+                return
+
             FileManager.restore(args.path)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
 
-    def empty_trash(self):
+    def empty_trash(self, args):
         try:
+            if args == 'help':
+                return
+
             FileManager.empty_trash()
         except Exception as e:
             UserInterface.show_error(
@@ -357,16 +403,88 @@ class GoogleCloudTerminal:
             args (str): аргументы для команды tree
         """
         try:
-            FileManager.tree(path=args.path, dirs_only=args.dirs_only, no_indent=args.no_indent, size=args.size)
+            if args == 'help':
+                return
+
+            FileManager.tree(path=args.path, dirs_only=args.dirs_only, no_indent=args.no_indent, size=args.size, pattern=args.pattern)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
 
+    def disk_usage(self, args):
+        """
+        Отображение распределения занятой/свободной памяти.
+
+        Args:
+            args (str): аргументы для команды du
+        """
+        try:
+            if args == 'help':
+                return
+
+            FileManager.du(path=args.path, all=args.all, show_free_space=args.show_free_space)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+
+    def share(self, args):
+        """
+        Управление доступом и настройками общего доступа к файлам и папкам.
+
+        Args:
+            args (str): аргументы для команды du
+        """
+        try:
+            if args == 'help':
+                return
+
+            FileManager.share(path=args.path, email=args.email, role=args.role, type=args.type)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+
+    def quota(self, args):
+        """
+        Получение информации о квоте дискового пространства Google Drive.
+        """
+        try:
+            if args == 'help':
+                return
+
+            FileManager.quota()
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+
+    def export(self, args):
+        """
+        Скачиваем файлы с облака.
+
+        Args:
+            args (str): аргументы для команды download.
+        """
+        FileManager.export(path=args.path, local_path=args.local_path, mimeType=args.mimeType)
+
+    def export_format(self, args):
+        """
+        Помощь для пользователя определить в какие форматы он может преобразоват свой файл для скачивания.
+
+        Args:
+        args (str): аргументы для команды download.
+        """
+        FileManager.export_formats(path=args.path, mimeType=args.mimeType)
+
+
+
 # ren "" *txt
 
 if __name__ == '__main__':
     # mv ./file ./folder1
+    # export "./Test Results(5).zip"
 
     terminal = GoogleCloudTerminal()
 

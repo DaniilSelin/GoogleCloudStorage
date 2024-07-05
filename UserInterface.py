@@ -110,10 +110,6 @@ class UserInterface:
             formatted_message = "\r" + success_message
         sys.stdout.write(UserInterface.COLORS['green'] + formatted_message + UserInterface.COLORS['reset'] + '\n')
 
-    @staticmethod
-    def request_input(prompt):
-        sys.stdout.write(f"{UI.COLOR_YELLOW}{prompt}{UI.COLOR_RESET}")
-
 
 # Создание сокращения внутри класса
 UI = UserInterface

@@ -38,6 +38,11 @@ class CommandParser:
             'mimeType': CommandParser.parse_args_mimeType,
             'emptyTrash': CommandParser.parse_args_empty_trash,
             'tree': CommandParser.parse_args_tree,
+            'du': CommandParser.parse_args_du,
+            'share': CommandParser.parse_args_share,
+            'quota': CommandParser.parse_args_quota,
+            'export': CommandParser.parse_args_export,
+            'export_format': CommandParser.parse_args_export_format,
         }
 
         parts = shlex.split(input_string)  # Используем shlex для разбора строки
@@ -69,12 +74,13 @@ class CommandParser:
         parser = argparse.ArgumentParser(description="List files in the specified directory. ")
         parser.add_argument('path', nargs="?", default=None, help='Path to list')
         parser.add_argument('-l', '--long', action='store_true', help="Use a long listing format")
+        parser.add_argument('pattern', nargs="?", default=None, help='Pattern for files that need to be display. Does not work without the path argument!')
 
         try:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -95,7 +101,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
 
@@ -118,7 +124,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -142,7 +148,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -167,7 +173,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -195,7 +201,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -218,7 +224,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -241,7 +247,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -262,7 +268,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -284,7 +290,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -306,7 +312,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -327,7 +333,7 @@ class CommandParser:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
@@ -350,12 +356,138 @@ class CommandParser:
                             help="Make tree not print the indentation lines. ")
         parser.add_argument('-s', '--size', action='store_true',
                             help="Print the size of each file in bytes. ")
+        parser.add_argument('pattern', nargs="?", default=None, help='Pattern for files that need to be display. Does not work without the path argument!')
 
         try:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:
                 parser.print_help()
-                return None
+                return "help"
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_du(args):
+        parser = argparse.ArgumentParser(description="Estimate file space usage.")
+        parser.add_argument('path', nargs="?", default=None, help='The directory to start with.')
+        parser.add_argument('-s', '--show_free_space', action='store_true', help="Display information only about users drive.")
+        parser.add_argument('-a', '--all', action='store_true',
+                            help="Write counts for all files, not just directories.")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return "help"
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_share(args):
+        parser = argparse.ArgumentParser(description="Manage access and sharing settings for files and folders.")
+        parser.add_argument('path', nargs="?", default=None, help='The path to the file or folder to share.')
+        parser.add_argument('email', nargs="?", default=None, help='The email of the user to share with.')
+        parser.add_argument('-r', '--role', default='reader', choices=['writer', 'commenter', 'reader', 'organizer', 'fileOrganizer'],
+                            help='The role to assign to the user (writer, commenter, reader, organizer, fileOrganizer).')
+        parser.add_argument('-t', '--type', default='user', choices=['user', 'group', 'domain', 'anyone', 'restricted'],
+                            help='The type of access (user, group, domain, anyone, restricted (remove access to a user who has a link)). Default is user.')
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return "help"
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_quota(args):
+        parser = argparse.ArgumentParser(description="Information about the Google Drive disk space quota. ")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return "help"
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_export(args):
+        parser = argparse.ArgumentParser(
+            description="Export a file from Google Drive to a specified format and save it locally.")
+        parser.add_argument('path', help='The path to the file in Google Drive.')
+        parser.add_argument('local_path', help='The local path to save the exported file.')
+        parser.add_argument('-m', '--mimeType',
+                            help='The MIME type to export the file as. If not specified, the original MIME type will be used.')
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return "help"
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_export_format(args):
+        parser = argparse.ArgumentParser(
+            description="Get supported export formats for a given MIME type in Google Drive.")
+        parser.add_argument('path', nargs='?', default=None,
+                            help='Optional path to the file in Google Drive to retrieve its MIME type.')
+        parser.add_argument('-m', '--mimeType',
+                            help='MIME type of the file for which export formats are requested.')
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return "help"
 
             return parser.parse_args(args)
         except SystemExit:
