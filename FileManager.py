@@ -557,6 +557,8 @@ class FileManager:
         }
 
         # Найти первый истинный параметр и вызвать соответствующую функцию
+        # Раньше тут было три разных функций, но из за их ненадобности я оставил только одну
+        # Однако логику не решился удалять, поэтому пусть пока останется
         for action, func in actions.items():
             if locals()[action]:  # Проверить, если параметр истинный
                 func(path)
@@ -629,7 +631,7 @@ class FileManager:
             return None
 
     @staticmethod
-    def cp(source: str, destination: str, recursive=False):
+    def cp(source: str, destination: str, recursive=False, mimeType=None):
         """
         Копирует директории или файлы source в destination.
 
@@ -637,10 +639,11 @@ class FileManager:
             source (str): Путь к тому, что надо скопировать.
             destination (str): Путь куда надо скопировать.
             recursive (bool): Нужно ли копировать рекурсивно.
+            mimeType (str): Сужение посика нужного файла до определенного mimeType
         """
         stop_loading = UserInterface.show_loading_message()
 
-        source_id = PathNavigator.validate_path(source, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        source_id = PathNavigator.validate_path(source, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True, mimeType=mimeType)
         destination_id = PathNavigator.validate_path(destination, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
         # проверяем корректность обоих путей
         if not source_id:
@@ -877,7 +880,7 @@ class FileManager:
                 )
 
     @staticmethod
-    def rm(path, recursive, verbose, interactive):
+    def rm(path, recursive, verbose, interactive, mimeType):
         """
         Удаляет директорию или файл, путь к которму path.
 
@@ -886,10 +889,11 @@ class FileManager:
             verbose (bool): Выводить ли дополнительную информацию, о этапах удаления файла.
             interactive (bool): Запрашивать согласие перед каждым удалением файла, в случае отказа, файл не будет удлён.
             recursive (bool): Каскадное удаление файлов в path.
+            mimeType (str): Сужение посика нужного файла до определенного mimeType
         """
         stop_loading = UserInterface.show_loading_message()
 
-        id_remove = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        id_remove = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True, mimeType=mimeType)
         if not id_remove:
             stop_loading()
             return None
@@ -1001,18 +1005,19 @@ class FileManager:
                 return
 
     @staticmethod
-    def mv(source_path: str, destination_path: str):
+    def mv(source_path: str, destination_path: str, mimeType: str):
         """
         Перемещает source_path в destination_path.
 
         Args:
             source_path (str): Путь к тому, что надо переместить.
             destination_path (str): Путь куда ндо переместить.
+            mimeType (str): Сужение посика нужного файла до определенного mimeType
         """
         stop_loading = UserInterface.show_loading_message()
 
         source_id = PathNavigator.validate_path(source_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
-                                                check_file=True)
+                                                check_file=True, mimeType=mimeType)
         destination_id = PathNavigator.validate_path(destination_path,
                                                      current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
@@ -1135,7 +1140,7 @@ class FileManager:
             UserInterface.show_message(f"{mime['mime']} ({mime['extension']}): {mime['description']}")
 
     @staticmethod
-    def trash(path):
+    def trash(path, mimeType):
         """
         Перемещает файл по пути path в корзину
 
@@ -1147,7 +1152,8 @@ class FileManager:
         file_id = PathNavigator.validate_path(
             path,
             os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
-            check_file=True
+            check_file=True,
+            mimeType=mimeType
         )
 
         if not file_id:
@@ -1179,7 +1185,7 @@ class FileManager:
         stop_loading()
 
     @staticmethod
-    def restore(path):
+    def restore(path, mimeType):
         """
         Восстанавливает файл из корзины по пути *path.
         * - учитывается положение файла до перемещения в корзину.
@@ -1192,7 +1198,8 @@ class FileManager:
         file_id = PathNavigator.validate_path(
             path,
             os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
-            check_file=True
+            check_file=True,
+            mimeType=mimeType
         )
 
         if not file_id:
@@ -1494,7 +1501,7 @@ class FileManager:
             )
 
     @staticmethod
-    def share(path, email, role, type):
+    def share(path, email, role, type, mimeType):
         """
         Управление доступом и настройками общего доступа к файлам и папкам.
 
@@ -1504,9 +1511,10 @@ class FileManager:
             role (str): Роль доступа ('writer', 'commenter', 'reader', 'organizer', 'fileOrganizer').
             type (str, optional): Тип доступа (по умолчанию 'user'). Может быть 'user', 'group', 'domain', 'anyone', или 'restricted'.
         """
+
         stop_loading = UserInterface.show_loading_message()
 
-        source_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        source_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True, mimeType=mimeType)
         if not source_id:
             UserInterface.show_error("Path is incorrect")
             stop_loading()
@@ -1565,11 +1573,116 @@ class FileManager:
         """
 
     @staticmethod
-    def upload():
+    def upload(path, local_path, name=None, mimeType=None, uploadType="SimpleUpload"):
         """
-           upload: Загрузка файла с локального компьютера в Google Drive.
-        Синтаксис: upload <local_path> <drive_path>
+        Загружаем файл с локального компьютера на Google Drive.
+
+        Args:
+            path (str): Путь в Google Drive, куда будет загружен файл.
+            local_path (str): Локальный путь к файлу для загрузки.
+            name (str): Опционально. Указывает имя для загружаемого файла.
+            mimeType (str): Опционально. Указывает MIME-тип загружаемого файла.
+            uploadType (str): Опционально. Указывает тип метода загрузки:
+                - SimpleUpload: Базовый метод загрузки для небольших файлов (5 МБ или меньше).
+                - MultipartUpload: Метод загрузки для небольших файлов (5 МБ или меньше).
+                - ResumableUpload: Метод многократной загрузки для крупных файлов с возможностью повтора (более 5 МБ).
         """
+        FileManager.SimpleUpload(path, local_path, name, mimeType)
+
+    @staticmethod
+    def SimpleUpload(path, local_path, name=None, mimeType=None):
+        """
+        Используйте этот тип загрузки для передачи небольшого медиафайла
+        (5 МБ или меньше) без предоставления метаданных
+        """
+        parents_id = PathNavigator.validate_path(path, check_file=True)
+
+        try:
+            with open(local_path, "rb") as file:
+                file_bytes = file.read()
+        except FileNotFoundError:
+            UserInterface.show_error(f"File {local_path} not found")
+            return None
+        except IsADirectoryError:
+            UserInterface.show_error(f"Path {local_path} is a directory, not a file")
+            return None
+
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}'
+        }
+
+        if mimeType:
+            headers['Content-Type'] = mimeType
+
+        url = f'https://www.googleapis.com/upload/drive/v3/files?uploadType=media'
+
+        params = {
+            'uploadType': 'media',
+            'name': name if name else os.path.basename(local_path),
+            'parents': [parents_id]
+        }
+
+        response = requests.post(url, headers=headers, params=params, data=file_bytes)
+
+        if response.status_code == 200:
+            UserInterface.show_success("Uploading file complete!")
+            return response.json()
+        else:
+            UserInterface.show_error(f'Failed to upload file. Status code: {response.status_code}')
+            return None
+
+    @staticmethod
+    def MultipartUpload():
+        """
+        «Используйте этот тип загрузки для передачи небольшого файла
+        (5 МБ или меньше) вместе с метаданными, описывающими файл, в одном запросе.
+        """
+
+    @staticmethod
+    def ResumableUpload():
+        """
+        используйте этот тип загрузки для больших файлов (более 5 МБ)
+        и при высокой вероятности прерывания сети, например при создании
+         файла из мобильного приложения.
+          Возобновляемые загрузки также являются хорошим выбором
+          для большинства приложений, поскольку они также работают
+           с небольшими файлами при минимальной стоимости одного
+           дополнительного HTTP-запроса на загрузку.
+        """
+
+    @staticmethod
+    def ChangeMime(path, new_mimeType):
+        """
+        change-mime: Изменение MIME-типа файла в Google Drive.
+        Синтаксис: change-mime <drive_path> <new_mimeType>
+
+        Args:
+            path (str): Путь к файлу в Google Drive.
+            new_mimeType (str): Новый MIME-тип, который нужно установить.
+        """
+        stop_loading = UserInterface.show_loading_message()
+
+        file_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/json'
+        }
+
+        url = f'https://www.googleapis.com/drive/v3/files/{file_id}'
+        body = {
+            'mimeType': new_mimeType
+        }
+
+        response = requests.patch(url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            UserInterface.show_success(f"MIME-type changed successfully for file {path}.")
+        else:
+            UserInterface.show_error(
+                f"Failed to change MIME-type. Status code: {response.status_code}: {response.text}")
+
+        stop_loading()
 
     @staticmethod
     def _confirm_export(mimeType):
@@ -1579,21 +1692,21 @@ class FileManager:
         Args:
             name_file (str): Имя файла, над которым будет производиться действие.
         """
+        UserInterface.show_message(
+            [{"text": f"before downloading this file, you need to convert it, select the type to convert: {mimeType}",
+              "color": "bright_yellow"}]
+        )
+        UserInterface.show_message(
+            [{
+                 "text": f"If you don't want to send file now enter no. ",
+                 "color": "bright_yellow"}]
+        )
+
         while True:
-            UserInterface.show_message(
-                [{"text": f"before downloading this file, you need to convert it, select the type to convert: {mimeType}",
-                  "color": "bright_yellow"}]
-            )
-            UserInterface.show_message(
-                [{
-                     "text": f"If you don't want to send file now enter no. ",
-                     "color": "bright_yellow"}]
-            )
-            UserInterface.show_message(
-                [{
-                     "text": f"Your choice: ",
-                     "color": "bright_yellow"}]
-            )
+            UserInterface.show_message([{
+                    "text": f"Your choice: ",
+                    "color": "bright_yellow"}],
+                    end="")
             response = input().strip().lower()
             if response in mimeType:
                 return response
@@ -1615,84 +1728,63 @@ class FileManager:
             mimeType (str): MIME-тип, в который нужно экспортировать файл.
             local_path (str): Путь на локальном компьютере для сохранения экспортированного файла.
         """
+        stop_loading = UserInterface.show_loading_message()
 
         file_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
         file_metadata = FileManager.get_file_metadata(file_id)
         source_mimeType = file_metadata['mimeType']
-
-        # MIME-типы, которые можно скачать напрямую
-        downloadable_mime_types = [
-            'application/vnd.google-apps.document',  # Google Docs
-            'application/vnd.google-apps.spreadsheet',  # Google Sheets
-            'application/vnd.google-apps.presentation',  # Google Slides
-            'application/vnd.google-apps.drawing',  # Google Drawings
-            'application/vnd.google-apps.form',  # Google Forms
-            'application/vnd.google-apps.script',  # Google Apps Scripts
-            'application/vnd.google-apps.map',  # Google My Maps
-            'application/vnd.google-apps.site',  # Google Sites
-            'application/vnd.google-apps.folder',  # Google Drive folder
-            'application/vnd.google-apps.file',  # Google Drive file
-            'application/zip',  # Zip file
-            'application/pdf',  # PDF file
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # Microsoft Word (docx)
-            'application/msword',  # Microsoft Word (doc)
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # Microsoft Excel (xlsx)
-            'application/vnd.ms-excel',  # Microsoft Excel (xls)
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',  # Microsoft PowerPoint (pptx)
-            'application/vnd.ms-powerpoint',  # Microsoft PowerPoint (ppt)
-            'image/jpeg',  # JPEG image
-            'image/png',  # PNG image
-            'image/gif',  # GIF image
-            'image/tiff',  # TIFF image
-            'image/bmp',  # BMP image
-            'text/plain',  # Plain text file
-            'text/csv',  # CSV file
-            'text/html',  # HTML file
-            'text/xml',  # XML file
-            'application/json',  # JSON file
-            'video/mp4',  # MP4 video file
-            'video/x-msvideo',  # AVI video file
-            'video/quicktime',  # QuickTime video file
-            'audio/mpeg',  # MP3 audio file
-            'audio/wav',  # WAV audio file
-            'audio/x-aiff',  # AIFF audio file
-        ]
 
         headers = {
             'Authorization': f'Bearer {FileManager._creds().token}',
             'Content-Type': 'application/json'
         }
 
-        if source_mimeType in downloadable_mime_types:
+        valid_mimeType = FileManager.export_formats(mimeType=source_mimeType, called_directly=False)
+
+        if valid_mimeType is None:
+            UserInterface.show_error("No export formats available for this file type.")
+            stop_loading()
+            return
+
+        # Если mimeType не требует конвертации и указанный пользователем совпадает с исходным или не указан
+        if valid_mimeType == 'NotRequire' and (not mimeType or mimeType == source_mimeType):
             url = f'https://www.googleapis.com/drive/v3/files/{file_id}?alt=media'
             response = requests.get(url, headers=headers, stream=True)
-
-            if response.status_code == 200:
-                local_path = os.path.join(os.getcwd(), os.path.basename(path))
-                with open(local_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        if chunk:
-                            f.write(chunk)
-                UserInterface.show_success(f"File downloaded successfully to {local_path}.")
+        else:
+            # Если mimeType указан и требует конвертации
+            if mimeType:
+                if mimeType in valid_mimeType:
+                    url = f'https://www.googleapis.com/drive/v3/files/{file_id}/export'
+                    params = {'mimeType': mimeType}
+                    response = requests.get(url, headers=headers, params=params, stream=True)
+                else:
+                    UserInterface.show_error("Invalid MIME type for export.")
+                    stop_loading()
+                    return
             else:
-                UserInterface.show_error(
-                    f"Failed to download file. Status code: {response.status_code}: {response.text}")
-            return
+                # Запрос пользователю указать mimeType
+                if mimeType is None:
+                    mimeType = FileManager.export_formats(path=path, called_directly=False)
+                else:
+                    mimeType = FileManager.export_formats(mimeType=mimeType, called_directly=False)
 
-        if mimeType is None:
-            mimeType = FileManager.export_formats(path=path, called_directly=False)
+                if mimeType is None:
+                    UserInterface.show_error("No export formats available for this file type.")
+                    stop_loading()
+                    return
+                stop_loading()
+                mimeType = FileManager._confirm_export(mimeType)
+                stop_loading = UserInterface.show_loading_message()
+                if not mimeType:
+                    stop_loading()
+                    return
 
-        if mimeType is None:
-            UserInterface.show_error("No export formats available for this file type.")
-            return
-
-        url = f'https://www.googleapis.com/drive/v3/files/{file_id}/export'
-        params = {'mimeType': mimeType}
-
-        response = requests.get(url, headers=headers, params=params, stream=True)
+                url = f'https://www.googleapis.com/drive/v3/files/{file_id}/export'
+                params = {'mimeType': mimeType}
+                response = requests.get(url, headers=headers, params=params, stream=True)
 
         if response.status_code == 200:
-            local_path = os.path.join(os.getcwd(), os.path.basename(path))
+            local_path = os.path.join(os.getcwd(), local_path)
             with open(local_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
@@ -1700,6 +1792,7 @@ class FileManager:
             UserInterface.show_success(f"File exported and downloaded successfully to {local_path}.")
         else:
             UserInterface.show_error(f"Failed to export file. Status code: {response.status_code}: {response.text}")
+        stop_loading()
 
     @staticmethod
     def export_formats(path=None, mimeType=None, called_directly=True):
@@ -1715,16 +1808,6 @@ class FileManager:
 
         # MIME-типы, которые можно скачать напрямую
         downloadable_mime_types = [
-            'application/vnd.google-apps.document',  # Google Docs
-            'application/vnd.google-apps.spreadsheet',  # Google Sheets
-            'application/vnd.google-apps.presentation',  # Google Slides
-            'application/vnd.google-apps.drawing',  # Google Drawings
-            'application/vnd.google-apps.form',  # Google Forms
-            'application/vnd.google-apps.script',  # Google Apps Scripts
-            'application/vnd.google-apps.map',  # Google My Maps
-            'application/vnd.google-apps.site',  # Google Sites
-            'application/vnd.google-apps.folder',  # Google Drive folder
-            'application/vnd.google-apps.file',  # Google Drive file
             'application/zip',  # Zip file
             'application/pdf',  # PDF file
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # Microsoft Word (docx)
@@ -1777,7 +1860,7 @@ class FileManager:
         if mimeType in downloadable_mime_types:
             if called_directly:
                 UserInterface.show_success("This format does not require conversion to download.")
-            return mimeType
+            return "NotRequire"
 
         if mimeType not in export_formats:
             if called_directly:
@@ -1789,7 +1872,3 @@ class FileManager:
                 UserInterface.show_message(export_type)
         else:
             return export_formats[mimeType]
-
-    @staticmethod
-    def info():
-        pass

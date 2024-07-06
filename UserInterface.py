@@ -48,6 +48,7 @@ class UserInterface:
 
     @staticmethod
     def show_loading_message(completion_message=None):
+        global stop_loading
         animation = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
         idx = 0
         # утсанавеваем событие для завершения анимации
@@ -76,6 +77,12 @@ class UserInterface:
         return stop
 
     @staticmethod
+    def stop_loading_animation():
+        """ Для экстренной остановки анимации """
+        if stop_loading:
+            stop_loading.set()
+
+    @staticmethod
     def format_message(segments):
         formatted_message = ""
         for segment in segments:
@@ -87,12 +94,12 @@ class UserInterface:
         return formatted_message
 
     @staticmethod
-    def show_message(message):
+    def show_message(message, end="\n"):
         if isinstance(message, list):
             formatted_message = UserInterface.format_message(message)
         else:
             formatted_message = "\r" + message
-        sys.stdout.write(formatted_message + '\n')
+        sys.stdout.write(formatted_message + end)
 
     @staticmethod
     def show_error(error_message):

@@ -11,7 +11,7 @@ class PathNavigator:
         и выделением каких либо структур из драйвера.
     """
     @staticmethod
-    def validate_path(path: str, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=False):
+    def validate_path(path: str, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=False, mimeType=None):
         # ОПАСНО не указывать current_path напрямую, так как питон заполняет это поле,
         # базовым значением, которе мы указали в GCT.current_path = root
         """
@@ -20,6 +20,8 @@ class PathNavigator:
         Args:
             path (str): Путь для проверки.
             current_path (str): Текущий путь.
+            check_file (bool): Включать файлы в зону поиска?
+            mimeType (str): Сузить круг поиска до определенного mimeTyep.
 
         Returns:
             str or None: Идентификатор папки, если путь существует, иначе None.
@@ -87,7 +89,10 @@ class PathNavigator:
         if not check_file:
             list_id = FileManagerProxy.look_for_file(name=path_parts[0], mime_type="application/vnd.google-apps.folder")
         else:
-            list_id = FileManagerProxy.look_for_file(name=path_parts[0])
+            if mimeType:
+                list_id = FileManagerProxy.look_for_file(name=path_parts[0], mime_type=mimeType)
+            else:
+                list_id = FileManagerProxy.look_for_file(name=path_parts[0])
 
         if not list_id:
             return None

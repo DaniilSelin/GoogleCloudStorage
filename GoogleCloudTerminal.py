@@ -186,6 +186,10 @@ class GoogleCloudTerminal:
             return self.export(args)
         elif command == "export_format":
             return self.export_format(args)
+        elif command == "ChangeMime":
+            return self.ChangeMime(args)
+        elif command == "upload":
+            return self.upload(args)
         else:
             UserInterface.show_error(
                 f"Unknown command {command}"
@@ -215,6 +219,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def list_files(self, args):
         """
@@ -232,6 +237,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def make_directory(self, args):
         """
@@ -248,6 +254,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def copy(self, args):
         """
@@ -259,11 +266,12 @@ class GoogleCloudTerminal:
             if args == 'help':
                 return
 
-            FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive)
+            FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive, mimeType=args.mimeType)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def remove(self, args):
         """
@@ -275,11 +283,12 @@ class GoogleCloudTerminal:
             if args == 'help':
                 return
 
-            FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose, interactive=args.interactive)
+            FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose, interactive=args.interactive, mimeType=args.mimeType)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def touch(self, args):
         """
@@ -300,6 +309,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def move(self, args):
         """
@@ -313,12 +323,14 @@ class GoogleCloudTerminal:
 
             FileManager.mv(
                 source_path=args.source_path,
-                destination_path=args.destination_path
+                destination_path=args.destination_path,
+                mimeType=args.mimeType
             )
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def rename(self, args):
         """
@@ -338,6 +350,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def mimeType(self, args):
         """
@@ -352,6 +365,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def trash(self, args):
         """
@@ -363,11 +377,12 @@ class GoogleCloudTerminal:
             if args == 'help':
                 return
 
-            FileManager.trash(args.path)
+            FileManager.trash(args.path, mimeType=args.mimeType)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def restore(self, args):
         """
@@ -379,11 +394,12 @@ class GoogleCloudTerminal:
             if args == 'help':
                 return
 
-            FileManager.restore(args.path)
+            FileManager.restore(args.path, mimeType=args.mimeType)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def empty_trash(self, args):
         try:
@@ -395,6 +411,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def tree(self, args):
         """
@@ -411,6 +428,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def disk_usage(self, args):
         """
@@ -428,6 +446,8 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
+
 
     def share(self, args):
         """
@@ -440,11 +460,12 @@ class GoogleCloudTerminal:
             if args == 'help':
                 return
 
-            FileManager.share(path=args.path, email=args.email, role=args.role, type=args.type)
+            FileManager.share(path=args.path, email=args.email, role=args.role, type=args.type, mimeType=args.mimeType)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def quota(self, args):
         """
@@ -459,6 +480,7 @@ class GoogleCloudTerminal:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
+            UserInterface.stop_loading_animation()
 
     def export(self, args):
         """
@@ -467,7 +489,16 @@ class GoogleCloudTerminal:
         Args:
             args (str): аргументы для команды download.
         """
-        FileManager.export(path=args.path, local_path=args.local_path, mimeType=args.mimeType)
+        try:
+            if args == 'help':
+                return
+
+            FileManager.export(path=args.path, local_path=args.local_path, mimeType=args.mimeType)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+            UserInterface.stop_loading_animation()
 
     def export_format(self, args):
         """
@@ -476,15 +507,38 @@ class GoogleCloudTerminal:
         Args:
         args (str): аргументы для команды download.
         """
-        FileManager.export_formats(path=args.path, mimeType=args.mimeType)
+        try:
+            if args == 'help':
+                return
 
+            FileManager.export_formats(path=args.path, mimeType=args.mimeType)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+            UserInterface.stop_loading_animation()
 
+    def ChangeMime(self, args):
+        """
+        Команда для изменения MimeType файла, который уже был создан/загружен.
 
-# ren "" *txt
+        Args:
+            args (str): аргументы для команды ChangeMime.
+        """
+        FileManager.ChangeMime(path=args.path, new_mimeType=args.new_mimeType)
+
+    def upload(self, args):
+        """
+        Команда для загрузки файла в облако
+
+        Args:
+            args (str): аргументы для команды upload.
+        """
+        FileManager.upload(local_path=args.local_path, path=args.path, name=args.name, mimeType=args.mimeType, uploadType=args.uploadType)
 
 if __name__ == '__main__':
-    # mv ./file ./folder1
-    # export "./Test Results(5).zip"
+    # upload ./requirements.txt ./
+    # ChangeMime ./a application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
 
     terminal = GoogleCloudTerminal()
 
