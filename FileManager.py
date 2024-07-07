@@ -575,9 +575,8 @@ class FileManager:
 
         if not path:
             parents_id = os.getenv("GOOGLE_CLOUD_CURRENT_PATH")
-
         else:
-            parents_id = PathNavigator.validate_path(path)
+            parents_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
         if not parents_id:
             UserInterface.show_error("Path is incorrect")
@@ -1573,7 +1572,26 @@ class FileManager:
         """
 
     @staticmethod
-    def upload(path, local_path, name=None, mimeType=None, uploadType="SimpleUpload"):
+    def _confirm_upload():
+        """
+        Запрашивает подтверждение действия у пользователя.
+
+        Args:
+            name_file (str): Имя файла, над которым будет производиться действие.
+        """
+        while True:
+            response = input("Should I continue sending the file (Y/N): ").strip().lower()
+            if response in ('yes', 'y'):
+                return True
+            elif response in ('no', 'n'):
+                return False
+            else:
+                UserInterface.show_message(
+                    [{"text": f"Please enter 'yes' or 'no' to confirm. ", "color": "bright_yellow"}]
+                )
+
+    @staticmethod
+    def upload(path, local_path="./", name=None, mimeType=None, uploadType="SimpleUpload"):
         """
         Загружаем файл с локального компьютера на Google Drive.
 
@@ -1587,16 +1605,90 @@ class FileManager:
                 - MultipartUpload: Метод загрузки для небольших файлов (5 МБ или меньше).
                 - ResumableUpload: Метод многократной загрузки для крупных файлов с возможностью повтора (более 5 МБ).
         """
-        FileManager.SimpleUpload(path, local_path, name, mimeType)
+        stop_loading = UserInterface.show_loading_message()
+
+        TypesUpload = {
+            "SimpleUpload": FileManager.SimpleUpload,
+            "MultipartUpload": FileManager.MultipartUpload,
+            "ResumableUpload": FileManager.ResumableUpload
+        }
+
+        if os.path.isfile(local_path):
+            file_size = os.path.getsize(local_path)
+            if uploadType != 'ResumableUpload' and file_size >= 6 * 1024 * 1024:  # 6 MB
+                stop_loading()
+                UserInterface.show_message(
+                    [{"text": f"File '{local_path}' exceeds the size limit of 6 MB, it is better to use ResumableUpload.",
+                      "color": "bright_yellow"}]
+                )
+                if FileManager._confirm_upload():
+                    stop_loading = UserInterface.show_loading_message()
+                    TypesUpload[uploadType](path, local_path, name, mimeType)
+                    stop_loading()
+                    return
+                else:
+                    UserInterface.show_message("The upload has been canceled. ")
+                    return
+            if uploadType == 'SimpleUpload' and (name or mimeType):
+                stop_loading()
+                UserInterface.show_message(
+                    [{
+                         "text": f"When you used a simple download, you can't specify the file name and type. I recommend u should use ResumableUpload",
+                         "color": "bright_yellow"}]
+                )
+                if FileManager._confirm_upload():
+                    stop_loading = UserInterface.show_loading_message()
+                    TypesUpload[uploadType](path, local_path, name, mimeType)
+                    stop_loading()
+                    return
+                else:
+                    UserInterface.show_message("The upload has been canceled. ")
+                    return
+            TypesUpload[uploadType](path, local_path, name, mimeType)
+        else:
+            UserInterface.show_error(f"File '{local_path}' does not exist.")
+        stop_loading()
+        return
 
     @staticmethod
-    def SimpleUpload(path, local_path, name=None, mimeType=None):
+    def creating_metadata_file(parents_id, name_file, mimeType):
+        """
+        Создаем метаданные файла перед записыванием туда даннных
+        """
+        # Метод для создания файла в Google Cloud
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/json'
+        }
+
+        url = f'https://www.googleapis.com/drive/v3/files'
+
+        body = {
+            "name": name_file,
+            'parents': [parents_id] if parents_id else [],
+            'fields': 'id'
+        }
+
+        if mimeType:
+            body["mimeType"] = mimeType
+
+        response = requests.post(url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            UserInterface.show_success("Creating file metadata complete!")
+            return response.json()
+        else:
+            UserInterface.show_error(f'Failed then create metadata file. Status code: {response.status_code}')
+            return None
+
+    @staticmethod
+    def SimpleUpload(path, local_path="./", name=None, mimeType=None):
         """
         Используйте этот тип загрузки для передачи небольшого медиафайла
-        (5 МБ или меньше) без предоставления метаданных
+        (5 МБ или меньше) без предоставления метаданных/ Но я все равно их задаю,
+        Так как потом будут траблы с преобразованием полученной много весящей пустышки
         """
-        parents_id = PathNavigator.validate_path(path, check_file=True)
-
+        # Дополнительные проверки на существоания файла!!!
         try:
             with open(local_path, "rb") as file:
                 file_bytes = file.read()
@@ -1607,48 +1699,175 @@ class FileManager:
             UserInterface.show_error(f"Path {local_path} is a directory, not a file")
             return None
 
+        file_id = FileManager.creating_metadata_file(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
+                                           os.path.basename(local_path),
+                                           None)['id']
+
+        if not file_id:
+            return
+
         headers = {
-            'Authorization': f'Bearer {FileManager._creds().token}'
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/octet-stream'
         }
 
-        if mimeType:
-            headers['Content-Type'] = mimeType
+        url_upload = f'https://www.googleapis.com/upload/drive/v3/files/{file_id}?uploadType=media'
 
-        url = f'https://www.googleapis.com/upload/drive/v3/files?uploadType=media'
+        response_upload = requests.patch(url_upload, headers=headers, data=file_bytes)
 
-        params = {
-            'uploadType': 'media',
-            'name': name if name else os.path.basename(local_path),
-            'parents': [parents_id]
-        }
-
-        response = requests.post(url, headers=headers, params=params, data=file_bytes)
-
-        if response.status_code == 200:
+        if response_upload.status_code == 200:
             UserInterface.show_success("Uploading file complete!")
-            return response.json()
+            return response_upload.json()
         else:
-            UserInterface.show_error(f'Failed to upload file. Status code: {response.status_code}')
+            UserInterface.show_error(f'Failed to upload file. Status code: {response_upload.status_code}')
             return None
 
     @staticmethod
-    def MultipartUpload():
+    def MultipartUpload(path, local_path, name=None, mimeType=None):
         """
         «Используйте этот тип загрузки для передачи небольшого файла
         (5 МБ или меньше) вместе с метаданными, описывающими файл, в одном запросе.
         """
+        parents_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        # Дополнительные проверки на существоания файла!!!
+        try:
+            with open(local_path, "rb") as file:
+                file_bytes = file.read()
+        except FileNotFoundError:
+            UserInterface.show_error(f"File {local_path} not found")
+            return None
+        except IsADirectoryError:
+            UserInterface.show_error(f"Path {local_path} is a directory, not a file")
+            return None
+
+        file_id = FileManager.creating_metadata_file(parents_id,
+                                                     name if name else os.path.basename(local_path),
+                                                     mimeType)['id']
+
+        if not file_id:
+            return
+
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': "application/json"
+        }
+        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
+
+        url_upload = f'https://www.googleapis.com/upload/drive/v3/files/{file_id}?uploadType=multipart'
+
+        response_upload = requests.patch(url_upload, headers=headers, data=file_bytes)
+
+        if response_upload.status_code == 200:
+            UserInterface.show_success("Uploading file complete!")
+            return response_upload.json()
+        else:
+            UserInterface.show_error(f'Failed to upload file. Status code: {response_upload.status_code}')
+            return None
 
     @staticmethod
-    def ResumableUpload():
+    def _determine_chunk_size(file_size):
+        """
+        Подбираем размер чанка в зависимости от размера файла
+        """
+        if file_size <= 50 * 1024 * 1024:  # ≤ 50 MB
+            return 1 * 1024 * 1024  # 1 MB
+        elif file_size <= 200 * 1024 * 1024:  # > 50 MB and ≤ 200 MB
+            return 5 * 1024 * 1024  # 5 MB
+        elif file_size <= 1 * 1024 * 1024 * 1024:  # > 200 MB and ≤ 1 GB
+            return 10 * 1024 * 1024  # 10 MB
+        else:  # > 1 GB
+            return 20 * 1024 * 1024  # 20 MB
+
+    @staticmethod
+    def ResumableUpload(path, local_path, name=None, mimeType=None):
         """
         используйте этот тип загрузки для больших файлов (более 5 МБ)
-        и при высокой вероятности прерывания сети, например при создании
-         файла из мобильного приложения.
-          Возобновляемые загрузки также являются хорошим выбором
-          для большинства приложений, поскольку они также работают
-           с небольшими файлами при минимальной стоимости одного
-           дополнительного HTTP-запроса на загрузку.
+        и при высокой вероятности прерывания сети
         """
+        stop_loading = UserInterface.show_loading_message()
+
+        parents_id = PathNavigator.validate_path(path,
+                                                 os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
+                                                 check_file=True)
+
+        # Создаем метаданные файла
+        metadata = {
+            'name': name if name else os.path.basename(local_path),
+            'parents': [parents_id],
+            'fields': 'id'
+        }
+        if mimeType:
+            metadata['mimeType'] = mimeType
+
+        headers = {
+            'Authorization': f'Bearer {FileManager._creds().token}',
+            'Content-Type': 'application/json; charset=UTF-8',
+            'X-Upload-Content-Type': mimeType if mimeType else 'application/octet-stream',
+        }
+
+        url_resumable_upload = f'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable'
+
+        #  Действуем строго согласно документации: https://developers.google.com/drive/api/guides/manage-uploads
+        # Отправляем первоначальный запрос и получаем URI возобновляемого сеанса.
+        start_response = requests.post(url_resumable_upload, headers=headers, json=metadata)
+        if start_response.status_code != 200:
+            UserInterface.show_error(f'Failed to start resumable upload. Status code: {start_response.status_code}: {start_response.text}')
+            return None
+
+        # Если все ок, извлекаем Location из заголовков
+        location = start_response.headers.get('Location')
+
+        if not location:
+            UserInterface.show_error(
+                f'No Location header in response. Status code: {start_response.status_code}: {start_response.text}')
+            return None
+
+        try:
+            file_size = os.path.getsize(local_path)
+            with open(local_path, "rb") as file:
+                file_bytes = file.read()
+        except FileNotFoundError:
+            UserInterface.show_error(f"File {local_path} not found")
+            return None
+        except IsADirectoryError:
+            UserInterface.show_error(
+                f"Path {local_path} is a directory, not a file"
+            )
+            return None
+
+        # Проверяем, сколько данных уже было загружено
+        if f'BYTES_UPLOADED_{name}' in os.environ:
+            bytes_uploaded = int(os.environ['BYTES_UPLOADED'])
+        else:
+            os.environ[f'BYTES_UPLOADED_{name}'] = '0'
+            bytes_uploaded = 0
+
+        # Загрузаем данные и отслеживаем состояние загрузки.
+        chunk_size = FileManager._determine_chunk_size(file_size)
+        uploading_update, stop_uploading = UserInterface.show_upload_process_message()
+        stop_loading()
+        with open(local_path, "rb") as file:
+            while bytes_uploaded < file_size:
+                chunk = file.read(chunk_size)
+                start_byte = bytes_uploaded
+                os.environ[f'BYTES_UPLOADED_{name}'] = str(start_byte)
+                end_byte = min(bytes_uploaded + chunk_size - 1, file_size - 1)
+
+                headers['Content-Range'] = f'bytes {start_byte}-{end_byte}/{file_size}'
+
+                upload_response = requests.put(location, headers=headers, data=chunk)
+
+                if upload_response.status_code not in [200, 201, 308]:
+                    UserInterface.show_error(
+                        f'Failed to upload chunk. Status code: {upload_response.status_code}: {upload_response.text}')
+                    stop_uploading()
+                    return None
+
+                bytes_uploaded += len(chunk)
+                uploading_update((bytes_uploaded / file_size) * 100)
+        stop_uploading()
+        UserInterface.show_success("Resumable uploading file complete!")
+        return upload_response.json()
 
     @staticmethod
     def ChangeMime(path, new_mimeType):

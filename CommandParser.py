@@ -541,9 +541,9 @@ class CommandParser:
     def parse_args_upload(args):
         parser = argparse.ArgumentParser(description="Upload a file to Google Drive.")
         parser.add_argument('local_path', type=str, help="Local path to the file to upload.")
-        parser.add_argument('path', type=str, help="Path in Google Drive where to upload.")
+        parser.add_argument('path', type=str, default="./", help="Path in Google Drive where to upload.")
         parser.add_argument('--name', type=str, default=None, help="Optional name for the uploaded file.")
-        parser.add_argument('--mimeType', type=str, default=None, help="Optional MIME type of the uploaded file.")
+        parser.add_argument('--mimeType', type=str, default=None, help="Optional MIME type of the uploaded file. Or you can just specify the file extension in the name. ")
         parser.add_argument('--uploadType', type=str, choices=['SimpleUpload', 'MultipartUpload', 'ResumableUpload'],
                             default='SimpleUpload',
                             help="Type of upload method (SimpleUpload, MultipartUpload, ResumableUpload). Default is SimpleUpload")

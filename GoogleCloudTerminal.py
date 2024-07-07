@@ -448,7 +448,6 @@ class GoogleCloudTerminal:
             )
             UserInterface.stop_loading_animation()
 
-
     def share(self, args):
         """
         Управление доступом и настройками общего доступа к файлам и папкам.
@@ -534,11 +533,24 @@ class GoogleCloudTerminal:
         Args:
             args (str): аргументы для команды upload.
         """
-        FileManager.upload(local_path=args.local_path, path=args.path, name=args.name, mimeType=args.mimeType, uploadType=args.uploadType)
+        try:
+            if args == 'help':
+                return
+
+            FileManager.upload(local_path=args.local_path, path=args.path, name=args.name, mimeType=args.mimeType,
+                               uploadType=args.uploadType)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+            UserInterface.stop_loading_animation()
+
 
 if __name__ == '__main__':
-    # upload ./requirements.txt ./
+    # upload ./requirements.txt ./folder1 --uploadType=MultipartUpload
+    # upload ./req.docx ./folder1 --uploadType=MultipartUpload
     # ChangeMime ./a application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+    # upload ../abobus.zip ./ --uploadType=ResumableUpload
 
     terminal = GoogleCloudTerminal()
 

@@ -77,6 +77,47 @@ class UserInterface:
         return stop
 
     @staticmethod
+    def show_upload_process_message(completion_message=None):
+        global stop_update, animation
+        animation = 0
+        stop_update = threading.Event()
+
+        def uploading():
+            while not stop_update.is_set():
+                # Прогресс-бар
+                bar_length = 40  # Длина прогресс-бара
+                filled_length = int(bar_length * animation // 100)
+                bar = '=' * filled_length + '-' * (bar_length - filled_length)
+                sys.stdout.write(f"\r|{bar}| {animation:.2f}%")
+                sys.stdout.flush()
+                time.sleep(0.5)
+
+            sys.stdout.write("\r" + " " * 60 + "\r")  # Очищаем строку после остановки
+            sys.stdout.flush()
+
+        t = threading.Thread(target=uploading)
+        t.start()
+
+        def animation_process(process):
+            global animation
+            animation = process
+
+        def stop():
+            stop_update.set()
+            t.join()
+            if completion_message:
+                sys.stdout.write(f"\r{completion_message}\n")
+                sys.stdout.flush()
+
+        return animation_process, stop
+
+    @staticmethod
+    def stop_uploading_animation():
+        """ Для экстренной остановки анимации """
+        if stop_update:
+            stop_update.set()
+
+    @staticmethod
     def stop_loading_animation():
         """ Для экстренной остановки анимации """
         if stop_loading:
@@ -122,12 +163,10 @@ class UserInterface:
 UI = UserInterface
 
 # Пример использования
+# Тестирование функции
 if __name__ == "__main__":
-    UI = UserInterface
-
-    UI.show_message([{'text': 'Starting authorization process...', 'color': 'bright_yellow'}])
-    UI.show_success([{'text': 'Authorization successful.', 'color': 'green'}])
-    UI.show_error([{'text': 'Failed to retrieve user drive ID. ', 'color': 'red'}, {'text': 'Please reauthorize.', 'color': 'yellow'}])
-    stop_loading = UserInterface.show_loading_message("Loading complete!")
-    time.sleep(5)  # Симулируем процесс
-    stop_loading()
+    animation_update, stop_animation = UserInterface.show_upload_process_message("Upload Complete!")
+    for i in range(101):
+        animation_update(i)
+        time.sleep(0.1)  # Симуляция времени загрузки
+    stop_animation()
