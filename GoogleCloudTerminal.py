@@ -158,6 +158,8 @@ class GoogleCloudTerminal:
             return self.make_directory(args)
         elif command == 'cp':
             return self.copy(args)
+        elif command == 'pattern_rm':
+            return self.pattern_remove(args)
         elif command == 'rm':
             return self.remove(args)
         elif command == 'touch':
@@ -267,6 +269,24 @@ class GoogleCloudTerminal:
                 return
 
             FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive, mimeType=args.mimeType)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+            UserInterface.stop_loading_animation()
+
+    def pattern_remove(self, args):
+        """
+        Метод для удаления по паттерну файлов/директорий
+        Args:
+            args: Аргументы для команды 'cp'.
+        """
+        try:
+            if args == 'help':
+                return
+
+            FileManager.pattern_rm(path_pattern=args.path_pattern, recursive=args.recursive, verbose=args.verbose,
+                                   interactive=args.interactive, mimeType=args.mimeType)
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -547,10 +567,7 @@ class GoogleCloudTerminal:
 
 
 if __name__ == '__main__':
-    # upload ./requirements.txt ./folder1 --uploadType=MultipartUpload
-    # upload ./req.docx ./folder1 --uploadType=MultipartUpload
-    # ChangeMime ./a application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-    # upload ../abobus.zip ./ --uploadType=ResumableUpload
+    # pattern_rm ./folder1/{*tex?}/folder1/{?parampus?} -
 
     terminal = GoogleCloudTerminal()
 

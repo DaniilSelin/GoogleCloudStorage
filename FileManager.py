@@ -420,6 +420,8 @@ class FileManager:
             create_parents (bool): Если True, создаются все необходимые родительские директории.
             called_directly (bool): Вызвана ли функция напрямую пользовтателем
         """
+        if path[0] != ".":
+            path = './' + path
         # проигрываем анимацию загрузки
         stop_loading = UserInterface.show_loading_message()
 
@@ -450,6 +452,7 @@ class FileManager:
 
             if not parents_id:
                 UserInterface.show_error("Path is incorrect")
+                stop_loading()
                 return None
 
         # Создаем заголовок с авторизационным токеном
@@ -865,10 +868,7 @@ class FileManager:
             name_file (str): Имя файла, над которым будет производиться действие.
         """
         while True:
-            UserInterface.show_message(
-                [{"text": f"Are you sure you want to delete this file: ", "color": "bright_yellow"}]
-            )
-            response = input().strip().lower()
+            response = input(f"Are you sure you want to delete this file (y/n): ").strip().lower()
             if response in ('yes', 'y'):
                 return True
             elif response in ('no', 'n'):
@@ -877,6 +877,109 @@ class FileManager:
                 UserInterface.show_message(
                     [{"text": f"Please enter 'yes' or 'no' to confirm. ", "color": "bright_yellow"}]
                 )
+
+    @staticmethod
+    def pattern_rm(path_pattern, recursive, verbose, interactive, mimeType):
+        """
+        Удаляет директорию или файл, путь к которму path.
+
+        Args:
+            path (str): Путь к тому, что надо удалить.
+            verbose (bool): Выводить ли дополнительную информацию, о этапах удаления файла.
+            interactive (bool): Запрашивать согласие перед каждым удалением файла, в случае отказа, файл не будет удлён.
+            recursive (bool): Каскадное удаление файлов в path.
+            mimeType (str): Сужение посика нужного файла до определенного mimeType
+            RGE (bool): Реквием голден экспириенс, мы откатываем паттерны назад
+        """
+        stop_loading = UserInterface.show_loading_message()
+        import fnmatch
+        # ЭТАП подготовки списка фалов - кандидатов на удлаения
+        delete_pattern = []
+
+        path_pattern = re.sub('\n', "", path_pattern)
+
+        path_pattern = path_pattern.strip("/").split("/")
+
+        if path_pattern[-1][0] == "{":
+            pattern_result = path_pattern[-1][1:-1]
+        else:
+            pattern_result = path_pattern[-1]
+
+        files = FileManager.get_list_of_files(called_directly=False)
+        # отбор кандидатов на удаления
+        for file in files:
+            if fnmatch.fnmatch(file['name'], pattern_result):
+                delete_pattern.append(file)
+
+        # ЭТАП подготовки полного пути указанного полбзователем
+        start_path = "./"
+        # ожидаемый конечный родитель
+        if path_pattern[0] == "~":
+            start_path = os.getenv("GOOGLE_CLOUD_MY_DRIVE_ID")
+            path_pattern.pop(0)
+        else:
+            start_path = os.getenv("GOOGLE_CLOUD_CURRENT_PATH")
+
+        def handle_double_dots(current_path):
+            """обработка .. в пути"""
+            nonlocal start_path
+            if path_pattern and path_pattern[0] == "..":
+                # получаем ид родителя и удаляем .. из пути
+                start_path = FileManager.get_file_metadata(current_path)['parents'][0]
+                path_pattern.pop(0)
+                return handle_double_dots(start_path)
+
+        handle_double_dots(start_path)
+
+        if path_pattern[0] == ".":
+            # если требуется начать с нынешней директории
+            should_parents = path_pattern
+            path_pattern.pop(0)
+
+        _path_pattern = PathNavigator.pwd(start_path)[:-1]
+        _path_pattern = re.sub('\n', "", _path_pattern)
+        _path_pattern = _path_pattern.strip("/").split("/")
+
+        full_path_pattern = _path_pattern + path_pattern
+        # ЭТАП фильтрации файлов выделенных под удаления
+        for file in delete_pattern:
+            # Убираем артефакты от каомынды pwd
+            candidate = PathNavigator.pwd(file['id'])[:-1]
+            candidate = re.sub('\n', "", candidate)
+            candidate = candidate.strip("/").split("/")
+            iterCand = iter(candidate)
+
+            for check in full_path_pattern:
+                PathOfCand = next(iterCand)
+
+                if not PathOfCand:
+                    delete_pattern.remove(file)
+                    break
+
+                if check[0] == "{":
+                    if not fnmatch.fnmatch(PathOfCand, check[1:-1]):
+                        delete_pattern.remove(file)
+                        break
+                else:
+                    if PathOfCand != check:
+                        delete_pattern.remove(file)
+                        break
+
+        # ЭТАП УДАЛЕНИЯ ОТБРАНЫХ ФАЙЛОВ
+        for file in delete_pattern:
+            candidate = PathNavigator.pwd(file['id'])[:-1]
+            candidate = candidate.replace("MyDrive", "~", 1)
+            UserInterface.show_message([
+            {"text": f"Start process delete: {candidate}",
+             'color': "bright_yellow"}
+            ])
+            stop_loading()
+            try:
+                FileManager.rm(candidate, recursive, verbose, interactive, mimeType)
+            except Exception as e:
+                UserInterface.show_error(f"error when deleting this file: {e}; I'm moving on to the next file")
+            stop_loading = UserInterface.show_loading_message()
+        stop_loading()
 
     @staticmethod
     def rm(path, recursive, verbose, interactive, mimeType):
@@ -906,12 +1009,13 @@ class FileManager:
                 response = None
 
                 if interactive:
+                    stop_loading()
                     if FileManager._confirm_action(file_remove_root['name']):
+                        stop_loading = UserInterface.show_loading_message()
                         UserInterface.show_message("The action is confirmed. We continue the execution. ")
                         response = FileManager._remove_file(id_remove)
                     else:
                         UserInterface.show_message("The action has been canceled. ")
-                        stop_loading()
                         return
 
                 else:
@@ -926,6 +1030,8 @@ class FileManager:
                     return
                 else:
                     UserInterface.show_error(f'error when deleting file: {response.status_code} - {response.text}')
+                    stop_loading()
+                    return
 
             elif recursive:
                 response = None
@@ -943,12 +1049,13 @@ class FileManager:
                     UserInterface.show_message(f"I'll trying delete: {file_remove_root['name']} (folder): {file_remove_root['id']}")
 
                 if interactive:
+                    stop_loading()
                     if FileManager._confirm_action(file_remove_root['name']):
+                        stop_loading = UserInterface.show_loading_message()
                         UserInterface.show_message("The action is confirmed. We continue the execution. ")
                         response = FileManager._remove_file(id_remove)
                     else:
                         UserInterface.show_message("The action has been canceled. ")
-                        stop_loading()
                         return
                 else:
                     # удаляем корень очищенной ветки
@@ -972,7 +1079,9 @@ class FileManager:
             response = None
 
             if interactive:
+                stop_loading()
                 if FileManager._confirm_action(file_remove_root['name']):
+                    stop_loading = UserInterface.show_loading_message()
                     UserInterface.show_message("The action is confirmed. We continue the execution. ")
                     response = FileManager._remove_file(id_remove)
                 else:
@@ -1937,7 +2046,7 @@ class FileManager:
                 )
 
     @staticmethod
-    def export(path, local_path="./", mimeType=None):
+    def export(path, local_path="", mimeType=None):
         """
         Экспорт файла из Google Drive в указанный формат и загрузка на локальный компьютер.
         Синтаксис: export <drive_path> <mimeType> <local_path>

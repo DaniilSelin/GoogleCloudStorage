@@ -29,6 +29,7 @@ class CommandParser:
             'cd': CommandParser.parse_args_cd,
             'mkdir': CommandParser.parse_args_mkdir,
             'cp': CommandParser.parse_args_cp,
+            'pattern_rm': CommandParser.parse_args_pattern_rm,
             'rm': CommandParser.parse_args_rm,
             'touch': CommandParser.parse_args_touch,
             'mv': CommandParser.parse_args_mv,
@@ -118,7 +119,7 @@ class CommandParser:
 
     @staticmethod
     def parse_args_mkdir(args):
-        parser = argparse.ArgumentParser(description="Create a new directory. ")
+        parser = argparse.ArgumentParser(description="Create a new directory.")
         parser.add_argument('path', nargs="+", default=None, help='Path to the new directory. ')
         parser.add_argument('-p', '--parents', action='store_true', help="Make parents directories as needed. ")
 
@@ -147,6 +148,32 @@ class CommandParser:
         parser.add_argument('-r', '--recursive', action='store_true', help="The need to recursively copy the contents of the directory. ")
         parser.add_argument('--mimeType', default=None, type=str,
                             help="mimeType for search file (if some file have the same name....)")
+
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return "help"
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_pattern_rm(args):
+        parser = argparse.ArgumentParser(description='Pattern-based rm command for Google Drive')
+        parser.add_argument('path_pattern', type=str, help='Path pattern to match files/folders: _path|{ur pattern}/path_')
+        parser.add_argument('-r', '--recursive', action='store_true', help='Recursively remove directories')
+        parser.add_argument('-v', '--verbose', action='store_true', help='Verbose mode')
+        parser.add_argument('-i', '--interactive', action='store_true', help='Interactive mode')
+        parser.add_argument('--mimeType', type=str, default=None, help='Filter by MIME type')
 
         try:
             # Проверка на наличие --help или -h
@@ -467,7 +494,7 @@ class CommandParser:
         parser = argparse.ArgumentParser(
             description="Export a file from Google Drive to a specified format and save it locally.")
         parser.add_argument('path', nargs="?", default=None, help='The path to the file in Google Drive.')
-        parser.add_argument('local_path', nargs="?", default="./", help='The local path to save the exported file.')
+        parser.add_argument('local_path', nargs="?", default="", help='The local path to save the exported file.')
         parser.add_argument('-m', '--mimeType',
                             help='The MIME type to export the file as. If not specified, the original MIME type will be used.')
 
