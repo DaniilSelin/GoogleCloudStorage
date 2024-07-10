@@ -192,6 +192,8 @@ class GoogleCloudTerminal:
             return self.ChangeMime(args)
         elif command == "upload":
             return self.upload(args)
+        elif command == "sync":
+            return self.synchronization(args)
         else:
             UserInterface.show_error(
                 f"Unknown command {command}"
@@ -544,7 +546,15 @@ class GoogleCloudTerminal:
         Args:
             args (str): аргументы для команды ChangeMime.
         """
-        FileManager.ChangeMime(path=args.path, new_mimeType=args.new_mimeType)
+        try:
+            if args == 'help':
+                return
+            FileManager.ChangeMime(path=args.path, new_mimeType=args.new_mimeType)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+            UserInterface.stop_loading_animation()
 
     def upload(self, args):
         """
@@ -565,9 +575,27 @@ class GoogleCloudTerminal:
             )
             UserInterface.stop_loading_animation()
 
+    def synchronization(self, args):
+        """
+        Команда для синхронизации папок (локально/на облаке)
+
+        Args:
+            args (str): аргументы для команды upload.
+        """
+        try:
+            if args == 'help':
+                return
+
+            FileManager.sync(drive_path=args.drive_path, local_path=args.local_path, sync_mode=args.mode)
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+            UserInterface.stop_loading_animation()
+
 
 if __name__ == '__main__':
-    # pattern_rm ./folder1/{*tex?}/folder1/{?parampus?} -
+    # ./folder1/{*log?}/result/{LOG_*]
 
     terminal = GoogleCloudTerminal()
 

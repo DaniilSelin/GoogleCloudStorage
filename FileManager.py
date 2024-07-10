@@ -911,6 +911,10 @@ class FileManager:
             if fnmatch.fnmatch(file['name'], pattern_result):
                 delete_pattern.append(file)
 
+        if not delete_pattern:
+            UserInterface.show_error(f"File with pattern {pattern_result} not found. ")
+            return
+
         # ЭТАП подготовки полного пути указанного полбзователем
         start_path = "./"
         # ожидаемый конечный родитель
@@ -1119,15 +1123,13 @@ class FileManager:
 
         Args:
             source_path (str): Путь к тому, что надо переместить.
-            destination_path (str): Путь куда ндо переместить.
-            mimeType (str): Сужение посика нужного файла до определенного mimeType
+            destination_path (str): Путь куда надо переместить.
+            mimeType (str): Сужение поиска нужного файла до определенного mimeType
         """
         stop_loading = UserInterface.show_loading_message()
 
-        source_id = PathNavigator.validate_path(source_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
-                                                check_file=True, mimeType=mimeType)
-        destination_id = PathNavigator.validate_path(destination_path,
-                                                     current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
+        source_id = PathNavigator.validate_path(source_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True, mimeType=mimeType)
+        destination_id = PathNavigator.validate_path(destination_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
 
         if not source_id:
             UserInterface.show_error("Source path is incorrect")
@@ -1153,7 +1155,8 @@ class FileManager:
             stop_loading()
             return
 
-        # Метод для обновления временных меток файла в Google Drive
+        old_parent_id = parents[0]
+
         headers = {
             'Authorization': f'Bearer {FileManager._creds().token}',
             'Content-Type': 'application/json'
@@ -1161,21 +1164,31 @@ class FileManager:
 
         url = f'https://www.googleapis.com/drive/v3/files/{source_id}'
 
+        # Сначала добавляем нового родителя
         body = {
-            'addParents': [destination_id],
-            'fields': 'id, parents'  # Указываем поля, которые хотим получить в ответе
+            'addParents': [destination_id]
+        }
+
+        response = requests.patch(url, headers=headers, json=body)
+
+        if response.status_code != 200:
+            UserInterface.show_error(f'Failed to add new parent. Status code: {response.status_code}: {response.text}')
+            stop_loading()
+            return None
+
+        # Затем удаляем старого родителя
+        body = {
+            'removeParents': [old_parent_id]
         }
 
         response = requests.patch(url, headers=headers, json=body)
 
         if response.status_code == 200:
-            UserInterface.show_success(f"Transfer is completed, new parents id: {response.json()['id']}")
-            stop_loading()
-            return response.json()
+            UserInterface.show_success(f"Transfer is completed. File moved to new location.")
         else:
-            UserInterface.show_error(f'Failed to move file times. Status code: {response.status_code}: {response.text}')
-            stop_loading()
-            return None
+            UserInterface.show_error(f'Failed to remove old parent. Status code: {response.status_code}: {response.text}')
+
+        stop_loading()
 
     @staticmethod
     def ren(perl_expression, pattern_file):
@@ -1674,11 +1687,114 @@ class FileManager:
         stop_loading()
 
     @staticmethod
-    def sync():
+    def sync(drive_path, local_path, sync_mode="download"):
         """
-        sync: Синхронизация локальной директории с Google Drive.
-        Синтаксис: sync <local_path> <drive_path>
+        sync: Синхронизация репозитория. По факту скачивание папок
+        Синтаксис: sync <drive_path> <local_path> <sync_mode>
+
+        Args:
+            drive_path (str): Путь к папке в Google Drive.
+            local_path (str): Локальный путь для синхронизации.
+            sync_mode (int): Режим синхронизации (download - из облака в локального репозиторий, upload - из локального репозитория в облако).
         """
+        stop_loading = UserInterface.show_loading_message()
+
+        if sync_mode == "download":
+            FileManager.sync_from_cloud(drive_path, local_path)
+        else:
+            FileManager.sync_to_cloud(local_path, drive_path)
+
+        stop_loading()
+        UserInterface.show_success("Synchronization completed successfully")
+
+    @staticmethod
+    def sync_from_cloud(drive_path, local_path):
+        """
+        Синхронизация из облака в локальный репозиторий.
+        """
+        # Проверка существования локальной директории
+        if not os.path.exists(local_path):
+            os.makedirs(local_path)
+
+        # Получение идентификатора папки на Google Drive
+        folder_id = PathNavigator.validate_path(drive_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
+        if not folder_id:
+            UserInterface.show_error("Drive path is incorrect")
+            return
+
+        # Рекурсивное скачивание содержимого папки
+        FileManager._download_folder_contents(drive_path, local_path)
+
+    @staticmethod
+    def sync_to_cloud(local_path, drive_path):
+        """
+        Синхронизация из локального репозитория в облако.
+        """
+        # Проверка существования локальной директории
+        if not os.path.exists(local_path):
+            UserInterface.show_error("Local path does not exist")
+            return
+
+        # Получение идентификатора папки на Google Drive
+        folder_id = PathNavigator.validate_path(drive_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"),
+                                                check_file=False)
+        if not folder_id:
+            UserInterface.show_error("Drive path not found, i create this path")
+            FileManager.mkdir(drive_path, True)
+
+        # Рекурсивное загрузка содержимого локальной папки
+        FileManager._upload_folder_contents(local_path, drive_path)
+
+    @staticmethod
+    def _download_folder_contents(drive_path, local_path):
+        folder_id = PathNavigator.validate_path(drive_path, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
+        needed_copy = PathNavigator.gather_structure(folder_id)
+
+        iterator = iter(needed_copy)
+
+        # использую стандартный итератор для фикса проблемы с извлечением следующего элемента при "?"
+        for file in iterator:
+
+            if file == "!":
+                next_file = next(iterator, None)
+                if not next_file:
+                    break
+                elif next_file == "?":
+                    file = "?"
+                else:
+                    local_path = os.path.join(local_path, next_file['name'])
+                    # Проверка существования локальной директории
+                    if not os.path.exists(local_path):
+                        UserInterface.show_message(f"Create path {local_path}")
+                        os.mkdir(local_path)
+                    continue
+
+            if file == "?":
+                local_path = os.path.dirname(local_path)
+
+            if file != '!' and file != '?':
+                path = PathNavigator.pwd(file['id'])
+                path = path.replace("MyDrive", "~", 1)
+                UserInterface.show_message(f"Download file {path}")
+                file_local_path = os.path.join(local_path, file['name'])
+                FileManager.export(path, file_local_path)
+
+    @staticmethod
+    def _upload_folder_contents(local_path, drive_path):
+        drive_path.strip("/")
+        for item in os.listdir(local_path):
+            item_local_path = os.path.join(local_path, item)
+
+            if os.path.isdir(item_local_path):
+                # Обработка директорий на первом уровне
+                dir_drive_path = os.path.join(drive_path, item)
+                FileManager.mkdir(dir_drive_path, True)
+                # Загружаем содержимое директории на первом уровне
+                FileManager._upload_folder_contents(item_local_path, dir_drive_path)
+            else:
+                # Обработка файлов на первом уровне
+                UserInterface.show_message(f"Upload file: {item_local_path}")
+                FileManager.upload(drive_path, item_local_path, item, uploadType="MultipartUpload")
 
     @staticmethod
     def _confirm_upload():
