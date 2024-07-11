@@ -1,0 +1,7 @@
+2024-07-11 13:07:36,246 - ERROR - GoogleCloudTerminal.change_directory - 'NoneType' object has no attribute 'path'
+2024-07-11 13:32:14,085 - ERROR - GoogleCloudTerminal.change_directory - 'NoneType' object has no attribute 'path'
+2024-07-11 19:27:02,809 - ERROR - GoogleCloudTerminal.change_directory - 'parents'
+2024-07-11 19:29:08,431 - ERROR - GoogleCloudTerminal.change_directory - 'parents'
+2024-07-11 19:37:36,432 - ERROR - GoogleCloudTerminal.change_directory - 'parents'
+2024-07-11 19:40:00,671 - ERROR - GoogleCloudTerminal.change_directory - 'parents'
+2024-07-11 21:00:55,245 - ERROR - GoogleCloudTerminal.change_directory - 'parents'

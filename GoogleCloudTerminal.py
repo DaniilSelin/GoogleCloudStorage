@@ -2,15 +2,19 @@ from CommandParser import CommandParser
 from FileManager import FileManager
 from PathNavigator import PathNavigator
 from UserInterface import UserInterface
+from LOGGING import LOGGING
+from LOGGING import DummyLogger
 
 import os
 import sys
 import json
-import dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.exceptions import RefreshError
+import dotenv
+import readline
+import atexit
 
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
@@ -23,6 +27,9 @@ class GoogleCloudTerminal:
     Этот класс содержит отвечает за авторизацию пользователя,
     Вызывает нужный метод из FileManager в зависимости от сообщение UserInterface
     """
+    # Для истории команд
+    histfile = None
+    COMMANDS = []
 
     def __init__(self, token_path="encryption/token.json", credentials_path="encryption/credentials.json"):
         """
@@ -32,6 +39,13 @@ class GoogleCloudTerminal:
             token_path (str): Путь к файлу токена.
             credentials_path (str): Путь к файлу учетных данных.
         """
+        try:
+            self.logger_info, self.logger_error = LOGGING.setup_logging()
+        except Exception as e:
+            UserInterface.show_error(f"LOGGING was not started due to an error: {e}")
+            self.logger_info = DummyLogger()
+            self.logger_error = DummyLogger()
+
         # Чтобы это работало и на винде, подходи м к файлам по абсолютному пути
         self.token_path = os.path.join(os.path.dirname(__file__), token_path)
         self.credentials_path = os.path.join(os.path.dirname(__file__), credentials_path)
@@ -52,8 +66,15 @@ class GoogleCloudTerminal:
         else:
             UserInterface.show_error([
                 {'text': 'Failed to retrieve user drive ID. ', 'color': 'red'},
-                {'text': 'Please delete your token.json and reauthorize', 'color': 'yellow', "clear": "\n"}]
-                                     )
+                {'text': 'Please delete your token.json and reauthorize', 'color': 'yellow', "clear": "\n"}
+                                     ])
+        # Подключено ли автодополнение?
+        if int(os.getenv("COMPLETER")) == 1:
+            self.COMMANDS = GoogleCloudTerminal.COMMANDS
+            UserInterface.show_message([
+                {'text': "Preparing auto-completion... ", 'color': 'bright_yellow'}
+            ])
+            self.STRUCT = FileManager.PreparingAutoCompletion()
 
     @property
     def _creds(self):
@@ -147,6 +168,7 @@ class GoogleCloudTerminal:
         Args:
             input_string (str): Строка команды, введенная пользователем.
         """
+        self.logger_info.info(input_string)
 
         command, args = CommandParser.parser_command(input_string)
         if command == 'cd':
@@ -224,6 +246,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def list_files(self, args):
         """
@@ -242,6 +265,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def make_directory(self, args):
         """
@@ -259,6 +283,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def copy(self, args):
         """
@@ -276,6 +301,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def pattern_remove(self, args):
         """
@@ -294,6 +320,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def remove(self, args):
         """
@@ -311,6 +338,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def touch(self, args):
         """
@@ -332,6 +360,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def move(self, args):
         """
@@ -353,6 +382,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def rename(self, args):
         """
@@ -373,6 +403,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def mimeType(self, args):
         """
@@ -388,6 +419,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def trash(self, args):
         """
@@ -405,6 +437,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def restore(self, args):
         """
@@ -422,6 +455,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def empty_trash(self, args):
         try:
@@ -434,6 +468,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def tree(self, args):
         """
@@ -451,6 +486,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def disk_usage(self, args):
         """
@@ -469,6 +505,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def share(self, args):
         """
@@ -487,6 +524,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def quota(self, args):
         """
@@ -502,6 +540,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def export(self, args):
         """
@@ -520,6 +559,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def export_format(self, args):
         """
@@ -538,6 +578,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def ChangeMime(self, args):
         """
@@ -555,6 +596,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def upload(self, args):
         """
@@ -574,6 +616,7 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
     def synchronization(self, args):
         """
@@ -592,18 +635,53 @@ class GoogleCloudTerminal:
                 f"Incorrect use of the command caused the message. Called exception: {e}"
             )
             UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
 
+    @staticmethod
+    def load_history():
+        GoogleCloudTerminal.histfile = os.path.join(os.path.expanduser("~"), ".my_command_history")
+        try:
+            readline.read_history_file(GoogleCloudTerminal.histfile)
+        except FileNotFoundError:
+            pass
+
+    @staticmethod
+    # Сохранение истории команд в файл
+    def save_history():
+        GoogleCloudTerminal.histfile = os.path.join(os.path.expanduser("~"), ".my_command_history")
+        readline.write_history_file(GoogleCloudTerminal.histfile)
+
+    @staticmethod
+    # Настройка истории команд
+    def setup_history():
+        readline.set_history_length(1000)  # Максимальное количество сохраненных команд
+        GoogleCloudTerminal.load_history()
+        atexit.register(GoogleCloudTerminal.save_history)  # Сохранение истории при выходе
+
+    def completer(self, text, state):
+        if not GoogleCloudTerminal.COMMANDS:
+            return None
+        options = [cmd for cmd in self.COMMANDS+self.STRUCT if cmd.startswith(text)]
+        if state < len(options):
+            return options[state]
+        else:
+            return None
 
 if __name__ == '__main__':
     # ./folder1/{*log?}/result/{LOG_*]
 
+    GoogleCloudTerminal.setup_history()
+
     terminal = GoogleCloudTerminal()
 
-    sys.stdout.write(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')
+    readline.set_completer(GoogleCloudTerminal.completer)
+    readline.parse_and_bind('tab: complete')
+
+    #sys.stdout.write(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')
 
     while True:
-        input_string = sys.stdin.readline()
+        input_string = input(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')
 
         terminal.execute_command(input_string)
 
-        sys.stdout.write(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')
+        #sys.stdout.write(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')

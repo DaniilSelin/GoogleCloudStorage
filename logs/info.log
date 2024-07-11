@@ -1,0 +1,50 @@
+2024-07-11 13:06:16,478 - INFO - GoogleCloudTerminal.execute_command - ls -l
+
+2024-07-11 13:06:30,350 - INFO - GoogleCloudTerminal.execute_command - tree -h
+
+2024-07-11 13:06:36,268 - INFO - GoogleCloudTerminal.execute_command - tree -d
+
+2024-07-11 13:07:01,459 - INFO - GoogleCloudTerminal.execute_command - Copy of LoadCloud/
+
+2024-07-11 13:07:21,391 - INFO - GoogleCloudTerminal.execute_command -     Copy of folder2/cd "Copy of LoadCloud"
+
+2024-07-11 13:07:28,820 - INFO - GoogleCloudTerminal.execute_command - cd "Copy of LoadCloud"
+
+2024-07-11 13:07:36,245 - INFO - GoogleCloudTerminal.execute_command - cd -k
+
+2024-07-11 13:08:37,980 - INFO - ls -l
+
+2024-07-11 13:32:14,083 - INFO - cd -dsfs
+
+2024-07-11 13:34:09,126 - INFO - cd -sdfsdf abobus
+
+2024-07-11 19:24:11,132 - INFO - cd ../
+
+2024-07-11 19:27:01,950 - INFO - cd ../
+
+2024-07-11 19:27:21,062 - INFO - cd ./folder1
+
+2024-07-11 19:29:07,778 - INFO - cd ../
+2024-07-11 19:37:35,616 - INFO - cd ../
+2024-07-11 19:39:59,906 - INFO - cd ../
+2024-07-11 20:41:14,109 - INFO - ls
+2024-07-11 21:00:54,607 - INFO - cd ../
+2024-07-11 21:02:21,901 - INFO - cd ./folder1
+2024-07-11 21:02:25,103 - INFO - ls
+2024-07-11 21:03:33,273 - INFO - hghghcfgcgcd
+2024-07-11 21:03:46,660 - INFO - khkbjhb
+2024-07-11 21:04:56,638 - INFO - fdfdfdfdf
+2024-07-11 21:04:58,664 - INFO - sdfsdfdsf
+2024-07-11 21:05:05,335 - INFO - 
+2024-07-11 21:11:17,955 - INFO - cd ./sdfdf
+2024-07-11 21:11:26,504 - INFO - sdfsdfsdfsdfcv jkwqefdlkwfdkmwqf-sdfmsdf
+2024-07-11 21:12:03,104 - INFO - cd .dfsdfsdfsdsdsdfsdfsdf/sdf/sdf/sdf/
+2024-07-11 21:12:14,686 - INFO - ls -l
+2024-07-11 21:12:17,402 - INFO - ls -l
+2024-07-11 21:12:26,349 - INFO - tree -d -i
+2024-07-11 21:12:44,963 - INFO - tree -d
+2024-07-11 21:13:25,883 - INFO - emptyTrash
+2024-07-11 21:13:39,769 - INFO - tree --help
+2024-07-11 21:13:49,767 - INFO - quota --help
+2024-07-11 21:14:10,418 - INFO - cd ./LoadCloud/
+2024-07-11 21:14:44,809 - INFO - quota --help

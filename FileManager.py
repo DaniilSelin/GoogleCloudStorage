@@ -2316,3 +2316,63 @@ class FileManager:
                 UserInterface.show_message(export_type)
         else:
             return export_formats[mimeType]
+
+    @staticmethod
+    def PreparingAutoCompletion(path="~/", no_indent=True):
+        """
+        Подгрузчик структуры для авто-дополнения
+        """
+        stop_loading = UserInterface.show_loading_message()
+
+        STRUCT = []
+
+        if path:
+            source_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        else:
+            source_id = os.getenv("GOOGLE_CLOUD_CURRENT_PATH")
+
+        if not source_id:
+            UserInterface.show_error("Path is incorrect")
+            stop_loading()
+            return
+
+        files = PathNavigator.gather_structure(source_id)
+
+        iterator = iter(files)
+
+        count_space = 0
+        indent = "" if no_indent else "    "
+
+        # использую стандартный итератор для фикса проблемы с извлечением следующего элемента при "?"
+        for file in iterator:
+
+            if file == "!":
+                next_file = next(iterator, None)
+                if not next_file:
+                    break
+                elif next_file == "?":
+                    file = "?"
+                else:
+                    STRUCT.append(f"{count_space * indent}{next_file['name']}/")
+                    # улиняем путь так как поднялись на одну папку вверх
+                    count_space = 1
+                    if next_file["mimeType"] == 'application/vnd.google-apps.folder':
+                        indent = indent + next_file['name'] + "/"
+                    continue
+
+            if file == "?":
+                count_space = 1
+                # урезаем путь так как опустились на одну папку вверх
+                indent = indent[:-1]
+                i = len(indent) - 1
+                while i >= 0 and indent[i] != "/":
+                    indent = indent[:-1]
+                    i -= 1
+
+            if file != '!' and file != '?':
+                if no_indent:
+                    count_space = 1
+
+                STRUCT.append(f"{count_space * indent}{file['name']}")
+        stop_loading()
+        return STRUCT
