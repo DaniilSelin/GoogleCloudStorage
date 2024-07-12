@@ -29,7 +29,6 @@ class GoogleCloudTerminal:
     """
     # Для истории команд
     histfile = None
-    COMMANDS = []
 
     def __init__(self, token_path="encryption/token.json", credentials_path="encryption/credentials.json"):
         """
@@ -70,11 +69,10 @@ class GoogleCloudTerminal:
                                      ])
         # Подключено ли автодополнение?
         if int(os.getenv("COMPLETER")) == 1:
-            self.COMMANDS = GoogleCloudTerminal.COMMANDS
             UserInterface.show_message([
                 {'text': "Preparing auto-completion... ", 'color': 'bright_yellow'}
             ])
-            self.STRUCT = FileManager.PreparingAutoCompletion()
+            PathNavigator.prepare_completer()
 
     @property
     def _creds(self):
@@ -170,53 +168,36 @@ class GoogleCloudTerminal:
         """
         self.logger_info.info(input_string)
 
-        command, args = CommandParser.parser_command(input_string)
-        if command == 'cd':
-            return self.change_directory(args)
+        COMMANDS = {
+            'cd': self.change_directory,
+            'ls': self.list_files,
+            'mkdir': self.make_directory,
+            'cp': self.copy,
+            'pattern_rm': self.pattern_remove,
+            'rm': self.remove,
+            'touch': self.touch,
+            'mv': self.move,
+            'mimeType': self.mimeType,
+            'ren': self.rename,
+            'trash': self.trash,
+            'restore': self.restore,
+            'emptyTrash': self.empty_trash,
+            'tree': self.tree,
+            'du': self.disk_usage,
+            'share': self.share,
+            'quota': self.quota,
+            'export': self.export,
+            'export_format': self.export_format,
+            'ChangeMime': self.ChangeMime,
+            'upload': self.upload,
+            'sync': self.synchronization
+        }
 
-        elif command == 'ls':
-            return self.list_files(args)
-        elif command == 'mkdir':
-            return self.make_directory(args)
-        elif command == 'cp':
-            return self.copy(args)
-        elif command == 'pattern_rm':
-            return self.pattern_remove(args)
-        elif command == 'rm':
-            return self.remove(args)
-        elif command == 'touch':
-            return self.touch(args)
-        elif command == 'mv':
-            return self.move(args)
-        elif command == 'mimeType':
-            return self.mimeType(args)
-        elif command == 'ren':
-            return self.rename(args)
-        elif command == "trash":
-            return self.trash(args)
-        elif command == "restore":
-            return self.restore(args)
-        elif command == "emptyTrash":
-            return self.empty_trash(args)
-        elif command == "tree":
-            return self.tree(args)
-        elif command == "du":
-            return self.disk_usage(args)
-        elif command == "share":
-            return self.share(args)
-        elif command == "quota":
-            return self.quota(args)
-        elif command == "export":
-            return self.export(args)
-        elif command == "export_format":
-            return self.export_format(args)
-        elif command == "ChangeMime":
-            return self.ChangeMime(args)
-        elif command == "upload":
-            return self.upload(args)
-        elif command == "sync":
-            return self.synchronization(args)
-        else:
+        command, args = CommandParser.parser_command(input_string)
+
+        try:
+            COMMANDS[command](args)
+        except KeyError:
             UserInterface.show_error(
                 f"Unknown command {command}"
             )
@@ -658,14 +639,6 @@ class GoogleCloudTerminal:
         GoogleCloudTerminal.load_history()
         atexit.register(GoogleCloudTerminal.save_history)  # Сохранение истории при выходе
 
-    def completer(self, text, state):
-        if not GoogleCloudTerminal.COMMANDS:
-            return None
-        options = [cmd for cmd in self.COMMANDS+self.STRUCT if cmd.startswith(text)]
-        if state < len(options):
-            return options[state]
-        else:
-            return None
 
 if __name__ == '__main__':
     # ./folder1/{*log?}/result/{LOG_*]
@@ -674,7 +647,8 @@ if __name__ == '__main__':
 
     terminal = GoogleCloudTerminal()
 
-    readline.set_completer(GoogleCloudTerminal.completer)
+    # Устанавливаем функцию автодополнения
+    readline.set_completer(PathNavigator.completer)
     readline.parse_and_bind('tab: complete')
 
     #sys.stdout.write(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')

@@ -1,5 +1,6 @@
 import re
 import os
+import readline
 from FileManagerProxy import FileManagerProxy
 from UserInterface import UserInterface
 
@@ -10,6 +11,14 @@ class PathNavigator:
 
         и выделением каких либо структур из драйвера.
     """
+    COMMANDS = ['ls', 'cd', 'mkdir', 'cp', 'pattern_rm',
+                'rm', 'touch', 'mv', 'ren', 'trash',
+                'restore', 'mimeType', 'emptyTrash', 'tree', 'du',
+                'share', 'quota', 'export', 'export_format', 'ChangeMime',
+                'upload', 'sync'
+                ]
+    STRUCT = []
+
     @staticmethod
     def validate_path(path: str, current_path=os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=False, mimeType=None):
         # ОПАСНО не указывать current_path напрямую, так как питон заполняет это поле,
@@ -140,9 +149,12 @@ class PathNavigator:
         if new_path:
             # Обратный порядок, так как мы шли от текущей папки к корневой
             new_path.reverse()
+            now_path = "/".join(new_path) + "/"
             # Соединяем элементы списка в строку
-            return "MyDrive/" + "/".join(new_path) + "/"
+            os.environ["GOOGLE_CLOUD_CURRENT_ABSPATH_STR"] = now_path
+            return "MyDrive/" + now_path
         else:
+            os.environ["GOOGLE_CLOUD_CURRENT_ABSPATH_STR"] = ""
             return "MyDrive/"
 
     @staticmethod
@@ -281,3 +293,178 @@ class PathNavigator:
                 f"{reference['mime']} ({reference['extension']}): {reference['description']}. "
             )
         return mime_info
+
+    @staticmethod
+    def prepare_completer(path="~/", no_indent=True):
+        """
+        Подгрузчик структуры для авто-дополнения.
+        Огрзыок кода от команды tree
+        Args:
+            path (str) - путь от которого, строиться дерево
+            no_indent (bool) - костыль, так как код взят из FileManager.tree()
+        """
+        stop_loading = UserInterface.show_loading_message()
+
+        STRUCT = []
+
+        if path:
+            source_id = PathNavigator.validate_path(path, os.getenv("GOOGLE_CLOUD_CURRENT_PATH"), check_file=True)
+        else:
+            source_id = os.getenv("GOOGLE_CLOUD_CURRENT_PATH")
+
+        if not source_id:
+            UserInterface.show_error("Path is incorrect")
+            stop_loading()
+            return
+
+        files = PathNavigator.gather_structure(source_id)
+
+        iterator = iter(files)
+
+        count_space = 0
+        indent = "" if no_indent else "    "
+
+        # использую стандартный итератор для фикса проблемы с извлечением следующего элемента при "?"
+        for file in iterator:
+
+            if file == "!":
+                next_file = next(iterator, None)
+                if not next_file:
+                    break
+                elif next_file == "?":
+                    file = "?"
+                else:
+                    STRUCT.append(f"{count_space * indent}{next_file['name']}/")
+                    # улиняем путь так как поднялись на одну папку вверх
+                    count_space = 1
+                    if next_file["mimeType"] == 'application/vnd.google-apps.folder':
+                        indent = indent + next_file['name'] + "/"
+                    continue
+
+            if file == "?":
+                count_space = 1
+                # урезаем путь так как опустились на одну папку вверх
+                indent = indent[:-1]
+                i = len(indent) - 1
+                while i >= 0 and indent[i] != "/":
+                    indent = indent[:-1]
+                    i -= 1
+
+            if file != '!' and file != '?':
+                if no_indent:
+                    count_space = 1
+
+                STRUCT.append(f"{count_space * indent}{file['name']}")
+        stop_loading()
+        PathNavigator.STRUCT = STRUCT
+
+    @staticmethod
+    def completer(text, state):
+        """
+        Комплитер для авто-дополнений
+        """
+
+        def get_last_argument(input_line):
+            """
+            Получает последний аргумент из строки ввода, учитывая возможные кавычки.
+            """
+            args = []
+            in_quotes = False
+            current_arg = ''
+            for char in input_line:
+                if char == '"':
+                    in_quotes = not in_quotes
+                elif char == ' ' and not in_quotes:
+                    if current_arg:
+                        args.append(current_arg)
+                        current_arg = ''
+                else:
+                    current_arg += char
+            if current_arg:
+                args.append(current_arg)
+
+            # Последний аргумент
+            if args:
+                last_arg = args[-1]
+            else:
+                last_arg = ''
+
+            # Убираем кавычки, если они есть
+            last_arg = last_arg.strip('"').strip("'")
+
+            return last_arg
+
+        _path = os.getenv('GOOGLE_CLOUD_CURRENT_ABSPATH_STR')
+
+        # Получаем всю строку ввода
+        input_line = readline.get_line_buffer()
+        #print("input_line:", input_line)
+
+        last_arg = get_last_argument(input_line)
+        text = last_arg
+
+        #print("text: ", text)
+
+        text = re.sub('\n', "", text)
+
+        text = text.strip('"')
+        text = text.strip("'")
+        text = text.strip("/").split("/")
+
+        # ЭТАП подготовки полного пути указанного полбзователем
+        # ожидаемый конечный родитель
+        if text[0] == "~":
+            _path = ""
+            text.pop(0)
+
+        def shnlex_path(path):
+            if '/' not in path:
+                return ""
+
+            index = path.rfind('/')
+            return path[:index + 1]
+
+        def handle_double_dots():
+            """обработка .. в пути"""
+            nonlocal _path, text
+            if text and text[0] == "..":
+                if not _path:
+                    nonlocal flag
+                    flag = False
+                    return
+                # Найти позицию последнего вхождения символа "/"
+                _path = shnlex_path(_path)
+                text.pop(0)
+                return handle_double_dots()
+
+        flag = True
+
+        handle_double_dots()
+
+        if not flag:
+            return None
+
+        if text[0] == ".":
+            # если требуется начать с нынешней директории
+            text.pop(0)
+
+        path = _path + "/".join(text)
+
+        #print("After: ", path)
+
+        # Пример автодополнения: смотрим в STRUCT и предлагаем совпадения
+        options = [entry for entry in PathNavigator.STRUCT if entry.startswith(path)]
+
+        # Если есть только один вариант, автоматически дополняем его
+        if state < len(options):
+            option_to_insert = options[state]
+            last_slash_index = path.rfind('/')
+
+            # Если есть последний слеш, обрезаем опцию до этого слеша
+            if last_slash_index != -1:
+                option_to_insert = option_to_insert[last_slash_index + 1:]
+
+            readline.insert_text(option_to_insert)
+            return option_to_insert  # Возвращаем полную опцию для вывода пользователю
+        else:
+            return None

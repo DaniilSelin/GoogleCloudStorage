@@ -49,7 +49,11 @@ class CommandParser:
             "sync": CommandParser.parse_args_sync,
         }
 
-        parts = shlex.split(input_string)  # Используем shlex для разбора строки
+        try:
+            parts = shlex.split(input_string)  # Используем shlex для разбора строки
+        except ValueError:
+            UserInterface.show_error("No closing quotation")
+            return None, None
 
         if not parts:
             return None, None
