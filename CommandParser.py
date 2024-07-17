@@ -47,6 +47,7 @@ class CommandParser:
             'ChangeMime': CommandParser.parse_args_ChangeMime,
             'upload': CommandParser.parse_args_upload,
             "sync": CommandParser.parse_args_sync,
+            'refresh_completer': CommandParser.parse_args_refresh_completer,
         }
 
         try:
@@ -605,6 +606,27 @@ class CommandParser:
         parser.add_argument('local_path', help='Path to the local directory.')
         parser.add_argument('--mode', choices=['upload', 'download'], default='upload',
                                 help='Sync mode: "upload" for local to Google Drive, "download" for Google Drive to local. Default is "upload".')
+        try:
+            # Проверка на наличие --help или -h
+            if '--help' in args or '-h' in args:
+                parser.print_help()
+                return "help"
+
+            return parser.parse_args(args)
+        except SystemExit:
+            # Перехват SystemExit для предотвращения завершения программы
+            # При вызове --help или -h, класс parser вызывает это исключение
+            pass
+
+        except argparse.ArgumentError as e:
+            # Перехват ArgumentError для обработки ошибок неправильных аргументов
+            UserInterface.show_error(e)
+            return None
+
+    @staticmethod
+    def parse_args_refresh_completer(args):
+        parser = argparse.ArgumentParser(description="It's just refresh completer. ")
+
         try:
             # Проверка на наличие --help или -h
             if '--help' in args or '-h' in args:

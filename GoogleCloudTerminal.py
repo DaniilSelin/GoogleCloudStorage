@@ -68,11 +68,16 @@ class GoogleCloudTerminal:
                 {'text': 'Please delete your token.json and reauthorize', 'color': 'yellow', "clear": "\n"}
                                      ])
         # Подключено ли автодополнение?
-        if int(os.getenv("COMPLETER")) == 1:
+        if os.getenv("COMPLETER") == '1':
             UserInterface.show_message([
                 {'text': "Preparing auto-completion... ", 'color': 'bright_yellow'}
             ])
-            PathNavigator.prepare_completer()
+            try:
+                PathNavigator.prepare_completer()
+            except Exception as e:
+                UserInterface.show_error([
+                    f"Error when prepare completer: {e}"
+                ])
 
     @property
     def _creds(self):
@@ -190,7 +195,8 @@ class GoogleCloudTerminal:
             'export_format': self.export_format,
             'ChangeMime': self.ChangeMime,
             'upload': self.upload,
-            'sync': self.synchronization
+            'sync': self.synchronization,
+            'refresh_completer': self.refresh_completer
         }
 
         command, args = CommandParser.parser_command(input_string)
@@ -217,6 +223,7 @@ class GoogleCloudTerminal:
 
             if new_path:
                 os.environ["GOOGLE_CLOUD_CURRENT_PATH"] = new_path
+                os.environ["GOOGLE_CLOUD_CURRENT_ABSPATH_STR"] = args.path
                 return new_path
             else:
                 UserInterface.show_error(
@@ -258,7 +265,10 @@ class GoogleCloudTerminal:
             if args == 'help':
                 return
 
-            return FileManager.mkdir(path=args.path[0], create_parents=args.parents)
+            FileManager.mkdir(path=args.path[0], create_parents=args.parents)
+            if os.getenv("COMPLETER") == '1' and not args.parents:
+                PathNavigator.prepare_completer(path=args.path[0])
+                return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -277,6 +287,9 @@ class GoogleCloudTerminal:
                 return
 
             FileManager.cp(source=args.source, destination=args.destination, recursive=args.recursive, mimeType=args.mimeType)
+            if os.getenv("COMPLETER") == '1':
+                PathNavigator.prepare_completer(path=args.destination)
+            return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -314,6 +327,9 @@ class GoogleCloudTerminal:
                 return
 
             FileManager.rm(path=args.path, recursive=args.recursive, verbose=args.verbose, interactive=args.interactive, mimeType=args.mimeType)
+            if os.getenv("COMPLETER") == '1':
+                PathNavigator.refresh_completer(path=args.path)
+            return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -336,6 +352,9 @@ class GoogleCloudTerminal:
                             time_modification=args.modification,
                             verbose=args.verbose
                             )
+            if os.getenv("COMPLETER") == '1':
+                PathNavigator.prepare_completer(path=args.path)
+            return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -358,6 +377,10 @@ class GoogleCloudTerminal:
                 destination_path=args.destination_path,
                 mimeType=args.mimeType
             )
+            if os.getenv("COMPLETER") == '1':
+                PathNavigator.prepare_completer(path=args.destination_path)
+                PathNavigator.refresh_completer(path=args.source_path)
+            return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -413,6 +436,9 @@ class GoogleCloudTerminal:
                 return
 
             FileManager.trash(args.path, mimeType=args.mimeType)
+            if os.getenv("COMPLETER") == '1':
+                PathNavigator.refresh_completer_trash(path=args.path)
+            return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -431,6 +457,9 @@ class GoogleCloudTerminal:
                 return
 
             FileManager.restore(args.path, mimeType=args.mimeType)
+            if os.getenv("COMPLETER") == '1':
+                PathNavigator.prepare_completer(path=args.destination_path)
+            return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -592,6 +621,9 @@ class GoogleCloudTerminal:
 
             FileManager.upload(local_path=args.local_path, path=args.path, name=args.name, mimeType=args.mimeType,
                                uploadType=args.uploadType)
+            if os.getenv("COMPLETER") == '1':
+                PathNavigator.prepare_completer(path=args.path)
+            return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -611,6 +643,9 @@ class GoogleCloudTerminal:
                 return
 
             FileManager.sync(drive_path=args.drive_path, local_path=args.local_path, sync_mode=args.mode)
+            if os.getenv("COMPLETER") == '1' and args.mode == 'upload':
+                PathNavigator.prepare_completer(path=args.drive_path)
+            return
         except Exception as e:
             UserInterface.show_error(
                 f"Incorrect use of the command caused the message. Called exception: {e}"
@@ -639,6 +674,22 @@ class GoogleCloudTerminal:
         GoogleCloudTerminal.load_history()
         atexit.register(GoogleCloudTerminal.save_history)  # Сохранение истории при выходе
 
+    def refresh_completer(self, args):
+        """
+        Команда для обновления completer
+        """
+        try:
+            if args == 'help':
+                return
+
+            PathNavigator.prepare_completer()
+        except Exception as e:
+            UserInterface.show_error(
+                f"Incorrect use of the command caused the message. Called exception: {e}"
+            )
+            UserInterface.stop_loading_animation()
+            self.logger_error.error(e)
+
 
 if __name__ == '__main__':
     # ./folder1/{*log?}/result/{LOG_*]
@@ -651,11 +702,8 @@ if __name__ == '__main__':
     readline.set_completer(PathNavigator.completer)
     readline.parse_and_bind('tab: complete')
 
-    #sys.stdout.write(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')
-
     while True:
-        input_string = input(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')
+        pwd = PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))
+        input_string = input(f'{pwd} $ ')
 
         terminal.execute_command(input_string)
-
-        #sys.stdout.write(f'{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ ')

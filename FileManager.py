@@ -405,9 +405,9 @@ class FileManager:
                 else:
                     if pattern:
                         if fnmatch.fnmatch(file['name'], pattern):
-                            UserInterface.show_message(file['name'])
+                            UserInterface.show_message(file['name'] + " "*10)
                     else:
-                        UserInterface.show_message(file['name'])
+                        UserInterface.show_message(file['name'] + " "*10)
         stop_loading()
 
     @staticmethod
@@ -428,6 +428,7 @@ class FileManager:
         if create_parents:
             gather_needed = PathNavigator.gather_needed_paths(path)
             start_path, paths_to_create = gather_needed.values()
+            check_path = paths_to_create[0]
             new_paths_id = []
 
             while paths_to_create:
@@ -436,6 +437,8 @@ class FileManager:
                 new_paths_id.append(start_path)
                 paths_to_create.pop(0)
             stop_loading()
+            if os.getenv("COMPLETER") == '1':
+                PathNavigator.prepare_completer(path=check_path)
             return new_paths_id
 
         path_parts = re.sub('\n', "", path)
@@ -980,6 +983,8 @@ class FileManager:
             stop_loading()
             try:
                 FileManager.rm(candidate, recursive, verbose, interactive, mimeType)
+                if os.getenv("COMPLETER") == '1':
+                    PathNavigator.refresh_completer(path=candidate)
             except Exception as e:
                 UserInterface.show_error(f"error when deleting this file: {e}; I'm moving on to the next file")
             stop_loading = UserInterface.show_loading_message()
