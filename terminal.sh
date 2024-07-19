@@ -16,8 +16,12 @@ else
     exit 1
 fi
 
-# активируем окружение
-source env/bin/activate
+# Провяем активировано ли виртуальное окружение
+if [ -z "$VIRTUAL_ENV" ]; then
+    echo "Virtual environment is not activated."
+else
+    echo "Virtual environment is activated: $VIRTUAL_ENV"
+fi
 
 # запускаем терминал
 python3 ./TERMINAL/GoogleCloudTerminal.py

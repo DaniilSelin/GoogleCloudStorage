@@ -13,7 +13,7 @@ check_python() {
 check_python
 
 # Создаем виртуальное окружение
-python3 -m venv env
+python -m venv env
 
 # Активируем виртуальное окружение
 source env/bin/activate

@@ -8,11 +8,17 @@ if not exist "env" (
     set VENV_DIR=venv
 )
 
+::Провяем активировано ли виртуальное окружение
+if "%VIRTUAL_ENV%"=="" (
+    echo Virtual environment is not activated.
+) else (
+    echo Virtual environment is activated: %VIRTUAL_ENV%
+)
+
+
 :: Активируем оркужение
 call env\Scripts\activate
 
-:: Если папку штормило по папкам, то просто сюда запихай текущий путь
-:: Но учти, что надо и строчку выше поменять, чтобы окружение не создалось в текущей директории
 python3 ./TERMINAL/GoogleCloudTerminal.py
 
 :: Деактивируем окружение
