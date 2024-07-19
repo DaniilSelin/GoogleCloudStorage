@@ -4,7 +4,7 @@ import os
 import sys
 
 # Добавьте текущую рабочую директорию в sys.path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../TERMINAL')))
 
 from TERMINAL.GoogleCloudTerminal import GoogleCloudTerminal
 
@@ -32,9 +32,9 @@ class Testing(unittest.TestCase):
         super().__init__(*args, **kwargs)
 
         #создаем терминал для наших тестов
-        self.terminal = GoogleCloudTerminal.GoogleCloudTerminal(
-            token_path=os.path.join(os.path.dirname(__file__), "../../encryption/token.json"),
-            credentials_path=os.path.join(os.path.dirname(__file__), "../../encryption/credentials.json")
+        self.terminal = GoogleCloudTerminal(
+            token_path=os.path.join(os.path.dirname(__file__), "../../TERMINAL/encryption/token.json"),
+            credentials_path=os.path.join(os.path.dirname(__file__), "../../TERMINAL/encryption/credentials.json")
         )
 
     def setUp(self):
@@ -44,9 +44,9 @@ class Testing(unittest.TestCase):
     def setUpClass(cls):
         # Инициализируем экземпляр GoogleCloudTerminal, если он еще не был инициализирован
         if cls.terminal is None:
-            cls.terminal = GoogleCloudTerminal.GoogleCloudTerminal(
-                token_path=os.path.join(os.path.dirname(__file__), "../../encryption/token.json"),
-                credentials_path=os.path.join(os.path.dirname(__file__), "../../encryption/credentials.json")
+            cls.terminal = GoogleCloudTerminal(
+                token_path=os.path.join(os.path.dirname(__file__), "../../TERMINAL/encryption/token.json"),
+                credentials_path=os.path.join(os.path.dirname(__file__), "../../TERMINAL/encryption/credentials.json")
             )
 
         cls.test_cases = test_cases

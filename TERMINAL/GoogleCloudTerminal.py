@@ -1,9 +1,9 @@
-from CommandParser import CommandParser
-from FileManager import FileManager
-from PathNavigator import PathNavigator
-from UserInterface import UserInterface
-from LOGGING import LOGGING
-from LOGGING import DummyLogger
+from TERMINAL.CommandParser import CommandParser
+from TERMINAL.FileManager import FileManager
+from TERMINAL.PathNavigator import PathNavigator
+from TERMINAL.UserInterface import UserInterface
+from TERMINAL.LOGGING import LOGGING
+from TERMINAL.LOGGING import DummyLogger
 
 import os
 import sys
