@@ -18,6 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           cmd /c setup.bat
+          env\Scripts\activate
 
       - name: Create token.json
         env:

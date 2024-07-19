@@ -7,6 +7,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../TERMINAL')))
 
 from TERMINAL.GoogleCloudTerminal import GoogleCloudTerminal
+from TERMINAL.PathNavigator import PathNavigator
 
 # ест ли у нас директория для логов?
 if not os.path.exists('test-reports'):
@@ -55,7 +56,7 @@ class Testing(unittest.TestCase):
         test_cases_cd = test_cases['mkdir']
 
         for tester in test_cases_cd:
-            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            print(f'\n{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             cls.terminal.execute_command(tester)
 
     @classmethod
@@ -64,49 +65,49 @@ class Testing(unittest.TestCase):
         test_cases_cd = test_cases['rm']
 
         for tester in test_cases_cd:
-            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            print(f'\n{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             cls.terminal.execute_command(tester)
 
     def test_cd(self):
         test_cases_cd = test_cases['cd']
 
         for tester in test_cases_cd:
-            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            print(f'\n{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             self.terminal.execute_command(tester)
 
     def test_cp(self):
         test_cases_cd = test_cases['cp']
 
         for tester in test_cases_cd:
-            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            print(f'\n{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             self.terminal.execute_command(tester)
 
     def test_ls(self):
         test_cases_cd = test_cases['ls']
 
         for tester in test_cases_cd:
-            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            print(f'\n{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             self.terminal.execute_command(tester)
 
     def test_touch(self):
         test_cases_cd = test_cases['touch']
 
         for tester in test_cases_cd:
-            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            print(f'\n{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             self.terminal.execute_command(tester)
 
     def test_ren(self):
         test_cases_cd = test_cases['ren']
 
         for tester in test_cases_cd:
-            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            print(f'\n{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             self.terminal.execute_command(tester)
 
     def test_trash(self):
         test_cases_cd = test_cases['trash']
 
         for tester in test_cases_cd:
-            print(f'\n{GoogleCloudTerminal.PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
+            print(f'\n{PathNavigator.pwd(os.getenv("GOOGLE_CLOUD_CURRENT_PATH"))} $ {tester}')
             self.terminal.execute_command(tester)
 
 
