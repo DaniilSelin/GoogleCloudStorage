@@ -16,5 +16,10 @@ else
     exit 1
 fi
 
+# активируем окружение
+source env/bin/activate
+
 # запускаем терминал
 python3 ./TERMINAL/GoogleCloudTerminal.py
+
+deactivate
