@@ -1,0 +1,31 @@
+name: Run Tests Windows
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+
+      - name: Install dependencies
+        run: |
+          cmd /c setup.bat
+
+      - name: Create token.json
+        env:
+          TOKEN_GOOGLE_API: ${{ secrets.TOKEN_GOOGLE_API }}
+        run: python .github/workflows/use_secret.py
+
+      - name: Run tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          cmd /c terminal.bat
