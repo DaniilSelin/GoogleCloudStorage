@@ -6,7 +6,7 @@ import sys
 # Добавьте текущую рабочую директорию в sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-import GoogleCloudTerminal
+from TERMINAL.GoogleCloudTerminal import GoogleCloudTerminal
 
 # ест ли у нас директория для логов?
 if not os.path.exists('test-reports'):
