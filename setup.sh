@@ -7,6 +7,7 @@ check_python() {
     else
         echo "Python3 is not installed. Please install Python3..."
         exit 1
+    fi
 }
 
 check_python
